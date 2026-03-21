@@ -14,6 +14,7 @@ const ROOM_TTL    = 10 * 60 * 1000;
 const MAX_ROOMS   = 500;
 const KNOCK_TO    = 30_000;
 const SLUG_RE     = /^[a-z0-9][a-z0-9\-]{2,78}[a-z0-9]$/;
+const MAX_SLUG_LEN = 80;
 const ADJS  = ["swift","brave","calm","dark","epic","fair","gold","jade","keen","lush","mild","neat","pure","rapid","safe","teal","vast","warm","bold","cool"];
 const NOUNS = ["falcon","river","stone","bloom","flame","grove","haven","isle","jungle","kite","lagoon","mesa","nova","orbit","plaza","realm","summit","trail","vault","creek"];
 
@@ -133,7 +134,11 @@ app.get("/health",(_,res)=>{
   if(process.env.NODE_ENV==="production")return res.json({ok:true});
   res.json({ok:true,rooms:rooms.size,uptime:Math.floor(process.uptime())});
 });
-app.use((_,res)=>res.status(404).json({error:"not found"}));
+// NOTE: Don't catch /socket.io/ routes — let Socket.IO handle them
+app.use((req,res)=>{
+  if(req.path.startsWith("/socket.io"))return res.status(404).end();
+  res.status(404).json({error:"not found"});
+});
 
 // ─── Socket ───────────────────────────────────────────────────────────────────
 io.use((socket,next)=>{
@@ -150,7 +155,7 @@ io.on("connection",(socket)=>{
   let roomId=null,myInfo=null;
   const chatOk  =()=>rateOk(`chat:${socket.id}`,20);
   const sigOk   =()=>rateOk(`sig:${socket.id}`,300);
-  const knockOk =()=>rateOk(`knock:${socket._ip}`,3);
+  const knockOk =()=>rateOk(`knock:${socket._ip}`,10); // 10 knocks/min per IP
 
   socket.on("rooms:get",(_,cb)=>{if(cb)cb([...rooms.values()].filter(r=>r.isPublic).map(roomPub));});
   socket.on("slug:new",(_,cb)=>{if(cb)cb({slug:uniqueSlug()});});
@@ -159,9 +164,11 @@ io.on("connection",(socket)=>{
   // ── knock ──
   socket.on("knock",({roomId:rid,name,avatar},cb)=>{
     if(typeof cb!=="function")return;
-    if(!knockOk())return cb({ok:false,reason:"too many requests"});
     const room=rooms.get(rid);
+    // New room — no rate limit needed, just let them in
     if(!room)return cb({ok:true,action:"create"});
+    // Existing room — apply rate limit
+    if(!knockOk())return cb({ok:false,reason:"too many requests"});
     if(room.peers.size>=MAX_PEERS)return cb({ok:false,reason:"room_full"});
     if(room.locked)return cb({ok:false,reason:"room_locked"});
     if(room.isPublic)return cb({ok:true,action:"admitted"});
@@ -185,10 +192,13 @@ io.on("connection",(socket)=>{
   // ── join ──
   socket.on("join",({roomId:rid,roomName,name,avatar,isPublic},cb)=>{
     if(typeof cb!=="function")return;
-    rid=san(rid,MAX_SLUG_LEN).toLowerCase();
+    rid=san(rid,MAX_SLUG_LEN).toLowerCase()
+      .replace(/[^a-z0-9\-]/g,"")   // strip anything non-alphanumeric/dash
+      .replace(/\-+/g,"-")           // collapse multiple dashes
+      .replace(/^\-+|\-+$/g,"");    // trim leading/trailing dashes
     roomName=san(roomName,60)||rid;
     name=san(name,32);avatar=san(avatar,10)||"👤";
-    if(!rid||!SLUG_RE.test(rid))return cb({error:"invalid_room_id"});
+    if(!rid||rid.length<4||!SLUG_RE.test(rid))return cb({error:"invalid_room_id"});
     if(!name)return cb({error:"invalid_name"});
     if(rooms.size>=MAX_ROOMS&&!rooms.has(rid))return cb({error:"server_full"});
     let room=rooms.get(rid);

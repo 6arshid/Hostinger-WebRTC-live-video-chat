@@ -495,10 +495,34 @@ input.inp:focus,textarea.inp:focus{border-color:var(--accent)}
 #toast.show{opacity:1}
 
 /* connecting */
-#conn{position:fixed;inset:0;background:rgba(0,0,0,.85);display:grid;place-items:center;z-index:999}
+/* CONNECTING SCREEN — full page takeover */
+#connScreen{
+  position:fixed;inset:0;
+  background:var(--bg);
+  display:flex;align-items:center;justify-content:center;
+  flex-direction:column;
+  gap:18px;
+  z-index:99999;
+  transition:opacity .2s;
+}
+#connScreen.h{display:none!important}
+#connScreen .conn-card{
+  display:flex;flex-direction:column;align-items:center;gap:14px;
+  background:var(--s1);border:1px solid var(--border2);border-radius:22px;
+  padding:36px 44px;text-align:center;
+  box-shadow:0 20px 60px rgba(0,0,0,.4);
+  min-width:240px;
+}
+#connScreen .conn-logo{font-size:2rem;margin-bottom:2px}
+#connScreen .conn-name{font-weight:900;font-size:1.1rem;margin-bottom:4px}
+#connScreen .conn-name span{color:var(--accent)}
+#connMsg{font-size:.84rem;color:var(--sub);font-weight:500}
+
+/* old #conn kept for compat */
+#conn{display:none}
 #conn.h{display:none}
-#conn>div{display:flex;flex-direction:column;align-items:center;gap:12px;color:var(--text)}
-.spin{width:34px;height:34px;border:3px solid var(--border);border-top-color:var(--accent);
+
+.spin{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--accent);
   border-radius:50%;animation:sp .8s linear infinite}
 @keyframes sp{to{transform:rotate(360deg)}}
 
@@ -837,7 +861,17 @@ input.inp:focus,textarea.inp:focus{border-color:var(--accent)}
   </div>
 </div>
 
-<div id="conn" class="h"><div><div class="spin"></div><span id="connMsg">…</span></div></div>
+<!-- Full-page connecting screen -->
+<div id="connScreen" class="h">
+  <div class="conn-card">
+    <div class="conn-logo">📹</div>
+    <div class="conn-name">موله <span>Mulle</span></div>
+    <div class="spin"></div>
+    <span id="connMsg">در حال اتصال…</span>
+  </div>
+</div>
+<!-- legacy compat -->
+<div id="conn" class="h"></div>
 <div id="toast"></div>
 
 <!-- Scripts -->

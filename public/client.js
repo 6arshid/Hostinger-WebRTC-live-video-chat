@@ -38,14 +38,32 @@ let ytCanvas=null, ytDrawId=null, ytMediaRecorder=null, ytBlobs=[];
 // ─── UTILS ───────────────────────────────────────────────────────────────────
 let _tt;
 function toast(msg,dur=3000){const el=$("toast");el.textContent=msg;el.classList.add("show");clearTimeout(_tt);_tt=setTimeout(()=>el.classList.remove("show"),dur);}
-function setConn(on,msg){$("conn").classList.toggle("h",!on);if(msg)$("connMsg").textContent=msg;}
+function setConn(on,msg){
+  const el=$("connScreen");
+  if(!el)return;
+  if(on){
+    el.classList.remove("h");
+    if(msg)$("connMsg").textContent=msg;
+  }else{
+    el.classList.add("h");
+  }
+}
 function openModal(id){$(id).classList.remove("h");}
 function closeModal(id){$(id).classList.add("h");}
 function goHome(){closeModal("deletedModal");location.href=location.pathname;}
 function toggleFaq(el){const open=el.classList.contains("open");document.querySelectorAll(".faq-item.open").forEach(x=>x.classList.remove("open"));if(!open)el.classList.add("open");}
 function inviteURL(rid){return location.origin+location.pathname+"?room="+encodeURIComponent(rid);}
 function roomFromURL(){const p=new URLSearchParams(location.search);return p.get("room")||location.hash.replace("#","")||null;}
-function roomFromInput(v){try{const u=new URL(v);return u.searchParams.get("room")||"";}catch{}return v.trim().toLowerCase().replace(/\s+/g,"-").replace(/[^a-z0-9\-]/g,"");}
+function roomFromInput(v){
+  let rid="";
+  try{const u=new URL(v);rid=u.searchParams.get("room")||"";}
+  catch{rid=v.trim();}
+  // Clean: lowercase, only alphanumeric+dash, collapse dashes, trim dashes
+  return rid.toLowerCase()
+    .replace(/[^a-z0-9\-]/g,"")
+    .replace(/\-+/g,"-")
+    .replace(/^\-+|\-+$/g,"");
+}
 
 // ─── HOME — ROOM LIST ────────────────────────────────────────────────────────
 function renderRooms(list){
@@ -128,7 +146,8 @@ async function genSlug(){
   }
 }
 function onSlugInput(){
-  const v=$("cSlug").value.trim().toLowerCase().replace(/\s+/g,"-").replace(/[^a-z0-9\-]/g,"");
+  // Clean while typing (allow trailing dash while typing, but check on blur)
+  let v=$("cSlug").value.toLowerCase().replace(/[^a-z0-9\-]/g,"").replace(/\-+/g,"-");
   $("cSlug").value=v;refreshLink();slugOk=false;setSlugErr("");
   clearTimeout(_slugT);
   if(!v){setSlugErr(L().slugEmpty);return;}
@@ -152,9 +171,14 @@ function cpLink(){
 // ─── CREATE / JOIN ────────────────────────────────────────────────────────────
 async function doCreate(){
   const name=$("cName").value.trim();
-  const rname=$("cRoomName").value.trim()||"Room";
-  const slug=$("cSlug").value.trim();
+  const rname=$("cRoomName").value.trim()||"New Room";
+  let slug=$("cSlug").value.trim().toLowerCase().replace(/[^a-z0-9\-]/g,"").replace(/\-+/g,"-").replace(/^\-|\-$/g,"");
   if(!name)return toast(L().needName);
+  // Auto-fix slug if invalid
+  if(!slug||slug.length<4){
+    await genSlug();
+    slug=$("cSlug").value.trim();
+  }
   if(!slug||slug.length<4)return toast(L().needSlug);
   closeOv("ovCreate");
   await beginJoin(name,slug,rname,isPublic);
@@ -168,40 +192,132 @@ async function doJoin(){
   await beginJoin(name,rid);
 }
 async function beginJoin(name,roomId,roomName,pub){
+  // Final cleanup of roomId
+  roomId=roomId.toLowerCase().replace(/[^a-z0-9\-]/g,"").replace(/\-+/g,"-").replace(/^\-+|\-+$/g,"");
+  if(!roomId||roomId.length<4){toast(L().needSlug);return;}
   myName=name;myRoom=roomId;myRoomName=roomName||roomId;
   micOn=lobbyMicOn;camOn=lobbyCamOn;
+
+  // Stop any existing stream first
   if(localStream){localStream.getTracks().forEach(t=>t.stop());localStream=null;}
+
+  // Acquire media — try video+audio, fallback to audio-only, fallback to silent
   try{
-    localStream=await navigator.mediaDevices.getUserMedia({audio:true,video:{width:{ideal:1280},height:{ideal:720}}});
+    localStream=await navigator.mediaDevices.getUserMedia({
+      audio:true,
+      video:{width:{ideal:1280},height:{ideal:720},facingMode:"user"}
+    });
   }catch{
     try{localStream=await navigator.mediaDevices.getUserMedia({audio:true,video:false});}
-    catch{return toast(L().mediaError);}
+    catch{
+      // No media at all — create a silent audio track so WebRTC still works
+      const ctx=new AudioContext();
+      const dest=ctx.createMediaStreamDestination();
+      localStream=dest.stream;
+      toast("⚠️ دسترسی به میدیا محدود است");
+    }
   }
+
   localStream.getAudioTracks().forEach(t=>t.enabled=micOn);
   localStream.getVideoTracks().forEach(t=>t.enabled=camOn);
+
+  // Update URL
   history.replaceState({},"",inviteURL(roomId));
+
+  // IMMEDIATELY hide home and show full-screen connecting state
+  $("home").style.display="none";
+  ["ovCreate","ovJoin"].forEach(id=>{const el=$(id);if(el)el.classList.add("h");});
   setConn(true,L().connMsg);
-  initSocket(pub);
+
+  // Start socket
+  setTimeout(()=>initSocket(pub),80);
 }
 
 // ─── SOCKET ───────────────────────────────────────────────────────────────────
 function initSocket(pub){
-  socket=io({transports:["websocket","polling"]});
+  // Prevent double init
+  if(socket){socket.disconnect();socket=null;}
+
+  socket=io(location.origin,{
+    path:"/socket.io/",
+    transports:["websocket","polling"],
+    reconnectionDelay:1000,
+    reconnectionDelayMax:5000,
+    timeout:20000,
+    reconnectionAttempts:5,
+  });
+
   socket.on("rooms:list",renderRooms);
+
+  let connectErrCount=0;
+  socket.on("connect_error",(err)=>{
+    connectErrCount++;
+    console.error("[socket] connect_error:",err.message,"attempt:",connectErrCount);
+    setConn(true, `در حال اتصال مجدد… (${connectErrCount})`);
+    if(connectErrCount>=5){
+      setConn(false);showHome();
+      toast("❌ اتصال به سرور ممکن نبود — دوباره تلاش کنید",5000);
+    }
+  });
+
   socket.on("connect",()=>{
     myId=socket.id;
-    socket.emit("rooms:get",{},renderRooms);
+    console.log("[socket] connected:",myId);
     setConn(true,L().connKnock);
+
+    // Knock timeout
+    const knockTimeout=setTimeout(()=>{
+      setConn(false);showHome();
+      toast("❌ اتصال به سرور ممکن نبود — دوباره تلاش کنید",5000);
+    },15000);
+
     socket.emit("knock",{roomId:myRoom,name:myName,avatar:"👤"},res=>{
-      if(!res.ok){
+      clearTimeout(knockTimeout);
+      if(!res||!res.ok){
         setConn(false);showHome();
-        const reasons={room_full:L().roomFull,room_locked:L().roomLocked,denied:L().denied,timeout:L().timeout};
-        toast("❌ "+(reasons[res.reason]||res.reason),5000);
+        const reasons={
+          room_full: L().roomFull,
+          room_locked: L().roomLocked, 
+          denied: L().denied,
+          timeout: L().timeout,
+          "too many requests": "تعداد درخواست‌ها زیاد است — چند ثانیه صبر کنید",
+          too_many_requests: "تعداد درخواست‌ها زیاد است — چند ثانیه صبر کنید",
+        };
+        toast("❌ "+(reasons[res?.reason]||res?.reason||"خطا"),5000);
         return;
       }
       setConn(true,L().connJoin);
-      socket.emit("join",{roomId:myRoom,roomName:myRoomName,name:myName,avatar:"👤",isPublic:pub!==false},res2=>{
-        if(res2.error){setConn(false);showHome();toast("❌ "+res2.error);return;}
+      // Timeout if server doesn't respond
+      const joinTimeout=setTimeout(()=>{
+        setConn(false);showHome();
+        toast("❌ سرور پاسخ نداد — دوباره تلاش کنید",5000);
+      },12000);
+
+      // Sanitize roomName before sending (remove non-ASCII that server might reject)
+      const safeRoomName=(myRoomName||myRoom).replace(/[<>"'`]/g,"").trim().slice(0,60)||"Room";
+
+      console.log("[join] sending:",{roomId:myRoom,roomName:safeRoomName,name:myName});
+
+      socket.emit("join",{
+        roomId:myRoom,
+        roomName:safeRoomName,
+        name:myName,
+        avatar:"👤",
+        isPublic:pub!==false
+      },res2=>{
+        clearTimeout(joinTimeout);
+        console.log("[join] callback:",res2);
+        if(!res2||res2.error){
+          setConn(false);showHome();
+          const errMap={
+            invalid_room_id:"شناسه اتاق نامعتبر است",
+            invalid_name:"نام نامعتبر است",
+            room_full:L().roomFull,
+            server_full:"سرور پر است",
+          };
+          toast("❌ "+(errMap[res2?.error]||res2?.error||"خطا در ورود"),5000);
+          return;
+        }
         onJoined(res2);
       });
     });
@@ -264,11 +380,23 @@ function initSocket(pub){
 }
 
 function onJoined({isOwner,roomName,existingPeers}){
-  amOwner=isOwner;myRoomName=roomName||myRoomName;
-  showMeet();addLocalTile();
-  existingPeers.forEach(p=>{addPeerTile(p.id,p.name,p.avatar,p.isOwner);createPC(p.id,p.name,p.avatar,p.isOwner,false);});
-  updatePartList();
-  if(curBg!=="none")loadSeg().then(()=>startBgLoop());
+  amOwner=isOwner;
+  myRoomName=roomName||myRoomName;
+
+  // Show room UI first
+  showMeet();
+
+  // Use requestAnimationFrame to ensure DOM is painted before adding tiles
+  requestAnimationFrame(()=>{
+    addLocalTile();
+    existingPeers.forEach(p=>{
+      addPeerTile(p.id,p.name,p.avatar,p.isOwner);
+      createPC(p.id,p.name,p.avatar,p.isOwner,false);
+    });
+    updatePartList();
+    if(curBg!=="none")loadSeg().then(()=>startBgLoop());
+    console.log("[mulle] Room ready — peers:",existingPeers.length);
+  });
 }
 
 // ─── WebRTC ───────────────────────────────────────────────────────────────────
@@ -794,22 +922,48 @@ function doLeave(disc=true){
 }
 
 // ─── PAGE TRANSITIONS ─────────────────────────────────────────────────────────
-function showHome(){["home","knockWait","meet"].forEach((id,i)=>{$(id).style.display=i===0?"flex":"none";});setConn(false);}
+function showHome(){
+  $("home").style.display="flex";
+  $("knockWait").style.display="none";
+  $("meet").style.display="none";
+  setConn(false);
+}
 function showMeet(){
-  ["home","knockWait"].forEach(id=>{$(id).style.display="none";});
-  $("meet").style.display="flex";
-  $("mrname").textContent=myRoomName;$("hinvId").textContent=myRoom;
-  if(amOwner)setOwnerUI(true);setConn(false);
+  // Hide all pages
+  $("home").style.display="none";
+  $("knockWait").style.display="none";
+  // Close any open overlays
+  ["ovCreate","ovJoin"].forEach(id=>{
+    const el=$(id); if(el) el.classList.add("h");
+  });
+  // Show meet room
+  const meet=$("meet");
+  meet.style.display="flex";
+  meet.style.flexDirection="column";
+  $("mrname").textContent=myRoomName;
+  $("hinvId").textContent=myRoom;
+  if(amOwner)setOwnerUI(true);
+  setConn(false);
+  // Timer
   let s=0;
   const iv=setInterval(()=>{
-    if(!$("meet")||$("meet").style.display!=="flex"){clearInterval(iv);return;}
-    s++;$("tmr").textContent=`${String(Math.floor(s/60)).padStart(2,"0")}:${String(s%60).padStart(2,"0")}`;
+    const m=$("meet");
+    if(!m||m.style.display==="none"){clearInterval(iv);return;}
+    s++;
+    $("tmr").textContent=`${String(Math.floor(s/60)).padStart(2,"0")}:${String(s%60).padStart(2,"0")}`;
   },1000);
 }
 
 // ─── INIT ─────────────────────────────────────────────────────────────────────
 (async()=>{
+  // Load rooms list
   try{const list=await fetch("/api/rooms").then(r=>r.json());renderRooms(list);}catch{renderRooms([]);}
+
+  // Auto-open join panel if URL has room param
   const urlRoom=roomFromURL();
-  if(urlRoom){$("jRoom").value=urlRoom;openJoin();}
+  if(urlRoom){
+    $("jRoom").value=urlRoom;
+    // Small delay so page is fully rendered first
+    setTimeout(()=>openJoin(),100);
+  }
 })();
