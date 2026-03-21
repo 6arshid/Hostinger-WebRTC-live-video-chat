@@ -295,7 +295,7 @@ input.inp:focus,textarea.inp:focus{border-color:var(--accent)}
 /* ════════════════════════════════════════════════
    MEET ROOM
 ════════════════════════════════════════════════ */
-#meet{flex:1;display:none;flex-direction:column;min-height:0}
+#meet{flex:1;display:none;flex-direction:column;min-height:0;height:100%}
 
 .mhdr{height:var(--hdr);display:flex;align-items:center;justify-content:space-between;
   padding:0 12px;background:var(--s1);border-bottom:1px solid var(--border);flex-shrink:0;gap:6px}
@@ -329,10 +329,15 @@ input.inp:focus,textarea.inp:focus{border-color:var(--accent)}
 
 /* video grid */
 .mbody{display:flex;flex:1;min-height:0;overflow:hidden;position:relative}
-.gwrap{flex:1;position:relative;overflow:hidden;background:#04060e}
-#grid{display:grid;width:100%;height:100%;gap:4px;padding:4px;align-items:stretch}
-#grid.n1{grid-template-columns:1fr}
-#grid.n2{grid-template-columns:1fr 1fr}
+.gwrap{position:relative;overflow:hidden;background:#04060e;flex:1;min-height:0}
+#grid{
+  position:absolute;inset:0;
+  display:grid;
+  gap:4px;padding:4px;
+  box-sizing:border-box;
+}
+#grid.n1{grid-template-columns:1fr;grid-template-rows:1fr}
+#grid.n2{grid-template-columns:1fr 1fr;grid-template-rows:1fr}
 #grid.n3{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
 #grid.n4{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
 #grid.n5,#grid.n6{grid-template-columns:repeat(3,1fr);grid-template-rows:1fr 1fr}
@@ -341,19 +346,33 @@ input.inp:focus,textarea.inp:focus{border-color:var(--accent)}
 
 /* ── SPOTLIGHT / PIN layout ── */
 #grid.spotlight{
-  display:flex;flex-direction:column;gap:4px;padding:4px;
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+  padding:4px;
 }
 #grid.spotlight .tile-pinned{
-  flex:1;min-height:0;border-radius:var(--r);
+  flex:1;
+  min-height:0;
+  min-width:0;
+  width:100%;
+  border-radius:var(--r);
   border-color:var(--amber)!important;
-  transition:border-color .2s;
 }
 #grid.spotlight .tiles-strip{
-  display:flex;gap:4px;height:110px;flex-shrink:0;
+  display:flex;
+  flex-direction:row;
+  gap:4px;
+  height:120px;
+  flex-shrink:0;
+  overflow-x:auto;
+  overflow-y:hidden;
 }
 #grid.spotlight .tiles-strip .tile{
-  flex:1;min-width:0;height:110px;
-  border-radius:var(--r);flex-shrink:0;
+  flex:0 0 160px;
+  width:160px;
+  height:120px;
+  border-radius:var(--r);
 }
 /* pin button on each tile */
 .pin-btn{
@@ -567,18 +586,26 @@ input.inp:focus,textarea.inp:focus{border-color:var(--accent)}
     width:var(--chat)!important;border-radius:16px 16px 0 0;opacity:1!important;
     border-top:1px solid var(--border);border-left:none!important;border-right:none!important}
   .rpanel.h{height:0!important;width:0!important;overflow:hidden!important}
+  /* Mobile: all grid layouts stack vertically (one column) */
+  #grid.n1,#grid.n2,#grid.n3,#grid.n4,
+  #grid.n5,#grid.n6,#grid.n7,#grid.n8,
+  #grid.n9,#grid.n10{
+    grid-template-columns:1fr!important;
+    grid-template-rows:repeat(auto-fill,1fr)!important;
+    overflow-y:auto;
+  }
+  /* Spotlight on mobile */
+  #grid.spotlight .tiles-strip{height:90px}
+  #grid.spotlight .tiles-strip .tile{flex:0 0 120px;width:120px;height:90px}
   /* Mobile ctrl: circular icon-only buttons */
   .cb{
     width:46px;height:46px;min-width:46px;
-    border-radius:50%;
-    padding:0;
-    display:flex;flex-direction:column;align-items:center;justify-content:center;
-    gap:0;
+    border-radius:50%;padding:0;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;
   }
   .cb .ico{font-size:1.25rem}
   .cb span:last-child{display:none}
   .ctrl{gap:8px;padding:0 12px;height:var(--ctrl)}
-  /* Big red mic/cam off buttons stay prominent */
   .cb.off{background:rgba(239,68,68,.15);border-color:rgba(239,68,68,.4)}
   .mrname{display:none}
   .csep{display:none}

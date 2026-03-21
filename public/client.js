@@ -554,52 +554,43 @@ function mkTile(id,name,avatar,isLocal,isScr,isOwner=false){
 }
 function updateGrid(){
   const g=$("grid");
-  const allTiles=[...g.querySelectorAll(".tile")];
-  const total=allTiles.length;
+
+  // Step 1 — collect all .tile elements from anywhere inside #grid
+  // Use a temp holder so we can safely move them around
+  const holder=document.createElement("div");
+  [...g.querySelectorAll(".tile")].forEach(t=>holder.appendChild(t));
+
+  const tiles=[...holder.children];
+  const total=tiles.length;
   $("cnt").textContent=total;
 
+  // Step 2 — clear grid completely (no innerHTML — just remove non-tile children)
+  [...g.children].forEach(c=>g.removeChild(c));
+
   if(pinnedPeerId){
-    // ── SPOTLIGHT LAYOUT ──────────────────────────────────
+    // ── SPOTLIGHT ──
     g.className="spotlight";
 
-    // Detach existing wrappers if any
-    g.innerHTML="";
+    const pinnedEl=document.getElementById(`t-${pinnedPeerId}`);
 
-    // Find pinned tile (may not exist yet if peer just joined)
-    const pinnedId=`t-${pinnedPeerId}`;
-    const pinnedEl=document.getElementById(pinnedId);
-
-    // Re-append pinned tile first (big)
+    // Put pinned tile first
     if(pinnedEl){
       pinnedEl.classList.add("tile-pinned");
       g.appendChild(pinnedEl);
     }
 
-    // Strip container for the rest
-    if(total>1||(total===1&&!pinnedEl)){
+    // Put remaining tiles in horizontal strip
+    const others=tiles.filter(t=>t!==pinnedEl);
+    if(others.length>0){
       const strip=document.createElement("div");
       strip.className="tiles-strip";
-      allTiles.forEach(t=>{
-        if(t.id!==pinnedId){
-          t.classList.remove("tile-pinned");
-          strip.appendChild(t);
-        }
-      });
-      if(strip.children.length>0) g.appendChild(strip);
+      others.forEach(t=>{t.classList.remove("tile-pinned");strip.appendChild(t);});
+      g.appendChild(strip);
     }
-
-    // If only 1 person (just me), no strip needed
-    if(total===1&&pinnedEl) pinnedEl.style.flex="1";
 
   }else{
-    // ── NORMAL GRID LAYOUT ───────────────────────────────
-    // Remove spotlight wrappers, put tiles back flat
-    const strip=g.querySelector(".tiles-strip");
-    if(strip){
-      [...strip.children].forEach(t=>g.appendChild(t));
-      strip.remove();
-    }
-    allTiles.forEach(t=>t.classList.remove("tile-pinned"));
+    // ── NORMAL GRID ──
+    tiles.forEach(t=>{t.classList.remove("tile-pinned");g.appendChild(t);});
     g.className=`n${Math.min(total,10)}`;
   }
 }
