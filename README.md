@@ -16,122 +16,6 @@
 
 ---
 
-## 🇮🇷 فارسی
-
-### معرفی
-
-**موله** یک سیستم تماس ویدیویی گروهی متن‌باز است که روی Node.js اجرا می‌شود.  
-بدون نیاز به ثبت‌نام، بدون نصب اپلیکیشن، با رمزنگاری end-to-end.
-
-### امکانات
-
-| امکان | توضیح |
-|-------|-------|
-| 🎥 **ویدیو و صدای HD** | کدک VP9/H264 + Opus، ارتباط P2P |
-| 🔒 **رمزنگاری E2E** | WebRTC DTLS/SRTP — سرور محتوا نمی‌بیند |
-| 🖥️ **اشتراک صفحه** | با صدای سیستم |
-| 🎨 **پس‌زمینه مجازی AI** | MediaPipe Selfie Segmentation — در مرورگر |
-| 📺 **پخش زنده YouTube** | با Stream Key یوتیوب |
-| ⏺️ **ضبط جلسه** | WebM با میکس صدای همه |
-| 👑 **کنترل مدیر** | تأیید ورود، سکوت، اخراج |
-| ⧉ **Picture in Picture** | ویدیو در پنجره شناور |
-| 🌐/🔒 **اتاق عمومی/خصوصی** | بدون تأیید یا با تأیید مدیر |
-| 🌍 **دو زبانه** | فارسی و انگلیسی |
-| 📱 **Responsive** | موبایل، تبلت، دسکتاپ |
-
-### نصب روی Hostinger
-
-#### پیش‌نیازها
-- Node.js 18+ 
-- پورت‌های باز: `3000/tcp` (یا 443)
-
-#### نصب سریع
-
-```bash
-# 1. دانلود پروژه
-git clone https://github.com/6arshid/Hostinger-WebRTC-live-video-chat.git
-cd Hostinger-WebRTC-live-video-chat
-
-# 2. نصب وابستگی‌ها (فقط express + socket.io — بدون native binary)
-npm install
-
-# 3. اجرا
-npm start
-```
-
-#### نصب روی Hostinger Node.js Hosting
-
-```
-hPanel → Node.js:
-  Entry file: server.js
-  Node version: 18+
-  → Install Dependencies → Start
-```
-
-#### متغیرهای محیطی (اختیاری)
-
-```bash
-PORT=3000                          # پورت سرور
-SSL_CERT=/path/to/fullchain.pem    # مسیر SSL
-SSL_KEY=/path/to/privkey.pem       # کلید SSL
-NODE_ENV=production                # حالت production
-ALLOWED_ORIGIN=https://yourdomain.com  # CORS origin
-```
-
-### پخش زنده YouTube
-
-#### روش ۱: مستقیم از مرورگر (دکمه Live)
-1. وارد اتاق شوید
-2. دکمه **📺 Live** را بزنید
-3. **Stream Key** از YouTube Studio را وارد کنید:
-   - `YouTube Studio` → `Go Live` → `Stream` → Copy stream key
-4. دکمه **▶ شروع پخش** را بزنید
-
-> **توجه:** مرورگر نمی‌تواند مستقیماً RTMP ارسال کند.  
-> برای پخش واقعی، از روش ۲ (ffmpeg) استفاده کنید.
-
-#### روش ۲: ffmpeg (پیشنهادی برای کیفیت بالا)
-
-```bash
-# روی سرور یا محلی:
-ffmpeg -f avfoundation -i "default" \
-  -c:v libx264 -preset ultrafast -b:v 2500k \
-  -c:a aac -b:a 128k \
-  -f flv rtmp://a.rtmp.youtube.com/live2/YOUR_STREAM_KEY
-```
-
-#### روش ۳: OBS Studio (آسان‌ترین)
-1. OBS را باز کنید
-2. `Settings` → `Stream` → `YouTube RTMPS`
-3. Stream Key را وارد کنید
-4. `Add Source` → `Browser` → آدرس موله را وارد کنید
-
-### امنیت
-
-- ✅ Content Security Policy (CSP)
-- ✅ X-Frame-Options: DENY
-- ✅ X-XSS-Protection
-- ✅ Rate Limiting (IP-based)
-- ✅ Input Sanitization
-- ✅ Slug Validation (regex)
-- ✅ Signal relay فقط بین peers همان اتاق
-- ✅ Max payload 64KB
-- ✅ Auto room cleanup پس از ۱۰ دقیقه
-
-### ساختار فایل‌ها
-
-```
-mulle/
-├── server.js          ← سرور signaling (امن، rate-limited)
-├── package.json       ← فقط express + socket.io
-└── public/
-    ├── index.html     ← UI دو زبانه (FA/EN)
-    ├── client.js      ← WebRTC + YouTube Live + Virtual BG
-    └── i18n.js        ← ترجمه‌ها
-```
-
----
-
 ## 🇬🇧 English
 
 ### About
@@ -248,6 +132,122 @@ mulle/
 - **No native binaries** — works on any Node.js hosting
 
 ---
+## 🇮🇷 فارسی
+
+### معرفی
+
+**موله** یک سیستم تماس ویدیویی گروهی متن‌باز است که روی Node.js اجرا می‌شود.  
+بدون نیاز به ثبت‌نام، بدون نصب اپلیکیشن، با رمزنگاری end-to-end.
+
+### امکانات
+
+| امکان | توضیح |
+|-------|-------|
+| 🎥 **ویدیو و صدای HD** | کدک VP9/H264 + Opus، ارتباط P2P |
+| 🔒 **رمزنگاری E2E** | WebRTC DTLS/SRTP — سرور محتوا نمی‌بیند |
+| 🖥️ **اشتراک صفحه** | با صدای سیستم |
+| 🎨 **پس‌زمینه مجازی AI** | MediaPipe Selfie Segmentation — در مرورگر |
+| 📺 **پخش زنده YouTube** | با Stream Key یوتیوب |
+| ⏺️ **ضبط جلسه** | WebM با میکس صدای همه |
+| 👑 **کنترل مدیر** | تأیید ورود، سکوت، اخراج |
+| ⧉ **Picture in Picture** | ویدیو در پنجره شناور |
+| 🌐/🔒 **اتاق عمومی/خصوصی** | بدون تأیید یا با تأیید مدیر |
+| 🌍 **دو زبانه** | فارسی و انگلیسی |
+| 📱 **Responsive** | موبایل، تبلت، دسکتاپ |
+
+### نصب روی Hostinger
+
+#### پیش‌نیازها
+- Node.js 18+ 
+- پورت‌های باز: `3000/tcp` (یا 443)
+
+#### نصب سریع
+
+```bash
+# 1. دانلود پروژه
+git clone https://github.com/6arshid/Hostinger-WebRTC-live-video-chat.git
+cd Hostinger-WebRTC-live-video-chat
+
+# 2. نصب وابستگی‌ها (فقط express + socket.io — بدون native binary)
+npm install
+
+# 3. اجرا
+npm start
+```
+
+#### نصب روی Hostinger Node.js Hosting
+
+```
+hPanel → Node.js:
+  Entry file: server.js
+  Node version: 18+
+  → Install Dependencies → Start
+```
+
+#### متغیرهای محیطی (اختیاری)
+
+```bash
+PORT=3000                          # پورت سرور
+SSL_CERT=/path/to/fullchain.pem    # مسیر SSL
+SSL_KEY=/path/to/privkey.pem       # کلید SSL
+NODE_ENV=production                # حالت production
+ALLOWED_ORIGIN=https://yourdomain.com  # CORS origin
+```
+
+### پخش زنده YouTube
+
+#### روش ۱: مستقیم از مرورگر (دکمه Live)
+1. وارد اتاق شوید
+2. دکمه **📺 Live** را بزنید
+3. **Stream Key** از YouTube Studio را وارد کنید:
+   - `YouTube Studio` → `Go Live` → `Stream` → Copy stream key
+4. دکمه **▶ شروع پخش** را بزنید
+
+> **توجه:** مرورگر نمی‌تواند مستقیماً RTMP ارسال کند.  
+> برای پخش واقعی، از روش ۲ (ffmpeg) استفاده کنید.
+
+#### روش ۲: ffmpeg (پیشنهادی برای کیفیت بالا)
+
+```bash
+# روی سرور یا محلی:
+ffmpeg -f avfoundation -i "default" \
+  -c:v libx264 -preset ultrafast -b:v 2500k \
+  -c:a aac -b:a 128k \
+  -f flv rtmp://a.rtmp.youtube.com/live2/YOUR_STREAM_KEY
+```
+
+#### روش ۳: OBS Studio (آسان‌ترین)
+1. OBS را باز کنید
+2. `Settings` → `Stream` → `YouTube RTMPS`
+3. Stream Key را وارد کنید
+4. `Add Source` → `Browser` → آدرس موله را وارد کنید
+
+### امنیت
+
+- ✅ Content Security Policy (CSP)
+- ✅ X-Frame-Options: DENY
+- ✅ X-XSS-Protection
+- ✅ Rate Limiting (IP-based)
+- ✅ Input Sanitization
+- ✅ Slug Validation (regex)
+- ✅ Signal relay فقط بین peers همان اتاق
+- ✅ Max payload 64KB
+- ✅ Auto room cleanup پس از ۱۰ دقیقه
+
+### ساختار فایل‌ها
+
+```
+mulle/
+├── server.js          ← سرور signaling (امن، rate-limited)
+├── package.json       ← فقط express + socket.io
+└── public/
+    ├── index.html     ← UI دو زبانه (FA/EN)
+    ├── client.js      ← WebRTC + YouTube Live + Virtual BG
+    └── i18n.js        ← ترجمه‌ها
+```
+
+---
+
 
 ## License
 
