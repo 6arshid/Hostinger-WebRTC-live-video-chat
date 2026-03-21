@@ -318,6 +318,7 @@ function initSocket(pub){
           toast("❌ "+(errMap[res2?.error]||res2?.error||"خطا در ورود"),5000);
           return;
         }
+        if(res2.iceServers&&res2.iceServers.length)ICE_CFG.splice(0,ICE_CFG.length,...res2.iceServers);
         onJoined(res2);
       });
     });
@@ -400,27 +401,65 @@ function onJoined({isOwner,roomName,existingPeers}){
 }
 
 // ─── WebRTC ───────────────────────────────────────────────────────────────────
-const ICE_CFG=[
-  {urls:"stun:stun.l.google.com:19302"},{urls:"stun:stun1.l.google.com:19302"},
+let ICE_CFG=[
+  {urls:"stun:stun.l.google.com:19302"},
+  {urls:"stun:stun1.l.google.com:19302"},
+  {urls:"stun:stun2.l.google.com:19302"},
   {urls:"turn:openrelay.metered.ca:80",username:"openrelayproject",credential:"openrelayproject"},
   {urls:"turn:openrelay.metered.ca:443",username:"openrelayproject",credential:"openrelayproject"},
   {urls:"turns:openrelay.metered.ca:443",username:"openrelayproject",credential:"openrelayproject"},
+  {urls:"turn:openrelay.metered.ca:443?transport=tcp",username:"openrelayproject",credential:"openrelayproject"},
 ];
 
 function createPC(pid,name,avatar,isOwner,iOffer){
   if(peers.has(pid))return peers.get(pid).pc;
-  const pc=new RTCPeerConnection({iceServers:ICE_CFG,bundlePolicy:"max-bundle"});
+  const pc=new RTCPeerConnection({
+    iceServers:ICE_CFG,
+    bundlePolicy:"max-bundle",
+    iceTransportPolicy:"all",
+  });
   peers.set(pid,{pc,name,avatar,isOwner,iceBuf:[]});
   localStream.getTracks().forEach(t=>pc.addTrack(t,localStream));
   if(screenStream)screenStream.getTracks().forEach(t=>pc.addTrack(t,screenStream));
-  pc.onicecandidate=({candidate})=>{if(candidate)socket.emit("signal",{to:pid,payload:{type:"candidate",candidate}});};
-  pc.oniceconnectionstatechange=()=>{if(pc.iceConnectionState==="failed")pc.restartIce();};
-  pc.ontrack=({track})=>{
+
+  pc.onicecandidate=({candidate})=>{
+    if(candidate)socket.emit("signal",{to:pid,payload:{type:"candidate",candidate}});
+  };
+  pc.onicecandidateerror=(e)=>{
+    if(e.errorCode!==701)console.warn("[ICE error]",e.errorCode,e.errorText,e.url);
+  };
+  pc.oniceconnectionstatechange=()=>{
+    const st=pc.iceConnectionState;
+    console.log(`[ICE ${pid.slice(0,6)}]`,st);
+    if(st==="failed"){
+      console.warn("[ICE] failed — restarting");
+      if(iOffer){pc.restartIce();doOffer(pid);}
+      else pc.restartIce();
+    }
+    if(st==="disconnected"){
+      // give it 5s to recover before restart
+      setTimeout(()=>{if(pc.iceConnectionState==="disconnected"){pc.restartIce();}},5000);
+    }
+  };
+  pc.onconnectionstatechange=()=>{
+    console.log(`[PC ${pid.slice(0,6)}]`,pc.connectionState);
+  };
+  pc.ontrack=({track,streams})=>{
     const tile=document.getElementById(`t-${pid}`);if(!tile)return;
     const vid=tile.querySelector("video");
-    if(!vid.srcObject)vid.srcObject=new MediaStream();
-    vid.srcObject.addTrack(track);vid.play().catch(()=>{});
-    if(track.kind==="video")tile.querySelector(".tile-av")?.classList.add("h");
+    // Use streams[0] if available, otherwise build manually
+    if(streams&&streams[0]){
+      if(vid.srcObject!==streams[0])vid.srcObject=streams[0];
+    }else{
+      if(!vid.srcObject)vid.srcObject=new MediaStream();
+      vid.srcObject.addTrack(track);
+    }
+    vid.play().catch(()=>{});
+    if(track.kind==="video"){
+      tile.querySelector(".tile-av")?.classList.add("h");
+      // ensure video plays when it becomes active
+      track.onunmute=()=>{vid.play().catch(()=>{});tile.querySelector(".tile-av")?.classList.add("h");};
+    }
   };
   if(iOffer)setTimeout(()=>doOffer(pid),150);
   return pc;
@@ -481,6 +520,29 @@ function mkTile(id,name,avatar,isLocal,isScr,isOwner=false){
   const nm=document.createElement("div");nm.className="tile-nm";nm.innerHTML=(isOwner?"<span>👑</span>":"")+esc(name);
   const ics=document.createElement("div");ics.className="tile-ics";if(!isScr)ics.innerHTML=`<div class="ti mic-ic">🎙️</div>`;
   const pip=document.createElement("button");pip.className="pip-btn";pip.textContent="⧉";pip.onclick=()=>openPiP(v);
+
+  // Watch / Hide button — lets any user hide/show a peer's video locally
+  const watchBtn=document.createElement("button");
+  watchBtn.className="watch-btn";
+  if(isLocal)watchBtn.style.display="none"; // don't show for own tile
+  watchBtn.title=window.currentLang==="fa"?"مشاهده / پنهان کردن ویدیو":"Watch / Hide video";
+  watchBtn.innerHTML="👁";
+  let vidHidden=false;
+  watchBtn.onclick=(e)=>{
+    e.stopPropagation();
+    vidHidden=!vidHidden;
+    v.style.visibility=vidHidden?"hidden":"";
+    // also hide/show the video element itself so layout stays intact
+    v.style.opacity=vidHidden?"0":"";
+    av.style.display=vidHidden?"flex":"";
+    if(vidHidden){av.classList.remove("h");}else{if(v.srcObject&&v.srcObject.getVideoTracks().some(t=>t.enabled))av.classList.add("h");}
+    watchBtn.innerHTML=vidHidden?"🚫👁":"👁";
+    watchBtn.title=vidHidden
+      ?(window.currentLang==="fa"?"نمایش ویدیو":"Show video")
+      :(window.currentLang==="fa"?"پنهان کردن ویدیو":"Hide video");
+    watchBtn.classList.toggle("hidden-active",vidHidden);
+  };
+
   // Pin button — only shown to owner, but rendered for all (hidden via CSS unless owner)
   const pinB=document.createElement("button");
   pinB.className="pin-btn"+(id==="local"?" visible":"");
@@ -488,7 +550,7 @@ function mkTile(id,name,avatar,isLocal,isScr,isOwner=false){
   pinB.textContent="📌";
   pinB.setAttribute("data-tid",id);
   pinB.onclick=(e)=>{e.stopPropagation();togglePin(id);};
-  d.append(v,av,nm,ics,pip,pinB);return d;
+  d.append(v,av,nm,ics,pip,watchBtn,pinB);return d;
 }
 function updateGrid(){
   const g=$("grid");
@@ -910,7 +972,15 @@ function cancelKnock(){socket?.disconnect();location.href=location.pathname;}
 function copyInvite(){navigator.clipboard.writeText(inviteURL(myRoom)).then(()=>toast(L().toastCopied));}
 
 // ─── LEAVE ────────────────────────────────────────────────────────────────────
-function leave(){amOwner?openModal("leaveModal"):doLeave(true);}
+function leave(){
+  const desc=$("leaveDesc");
+  if(desc){
+    desc.textContent=amOwner
+      ?(window.currentLang==="fa"?"شما مدیر هستید. ۱۰ دقیقه بعد از خروج، اتاق حذف می‌شود.":"You are the owner. The room will be deleted 10 minutes after you leave.")
+      :(window.currentLang==="fa"?"آیا می‌خواهید از اتاق خارج شوید؟":"Are you sure you want to leave the room?");
+  }
+  openModal("leaveModal");
+}
 function confirmLeave(){closeModal("leaveModal");doLeave(true);}
 function doLeave(disc=true){
   if(recording)stopRec();
@@ -919,6 +989,13 @@ function doLeave(disc=true){
   if(disc)socket?.disconnect();
   peers.forEach(({pc})=>{try{pc.close();}catch{}});peers.clear();
   localStream?.getTracks().forEach(t=>t.stop());localStream=null;
+  // Reset state
+  myRoom=null;myName=null;myRoomName=null;amOwner=false;pinnedPeerId=null;
+  // Clear grid
+  const g=$("grid");if(g)g.innerHTML="";
+  // Go back to home page
+  history.replaceState({},"",location.pathname);
+  showHome();
 }
 
 // ─── PAGE TRANSITIONS ─────────────────────────────────────────────────────────

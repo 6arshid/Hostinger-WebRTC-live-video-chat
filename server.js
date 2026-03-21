@@ -21,9 +21,14 @@ const NOUNS = ["falcon","river","stone","bloom","flame","grove","haven","isle","
 const ICE = [
   {urls:"stun:stun.l.google.com:19302"},
   {urls:"stun:stun1.l.google.com:19302"},
+  {urls:"stun:stun2.l.google.com:19302"},
+  {urls:"stun:stun3.l.google.com:19302"},
   {urls:"turn:openrelay.metered.ca:80",          username:"openrelayproject",credential:"openrelayproject"},
   {urls:"turn:openrelay.metered.ca:443",         username:"openrelayproject",credential:"openrelayproject"},
   {urls:"turns:openrelay.metered.ca:443",        username:"openrelayproject",credential:"openrelayproject"},
+  {urls:"turn:openrelay.metered.ca:443?transport=tcp", username:"openrelayproject",credential:"openrelayproject"},
+  // Cloudflare STUN
+  {urls:"stun:stun.cloudflare.com:3478"},
 ];
 
 // ─── Slug ─────────────────────────────────────────────────────────────────────
@@ -60,7 +65,7 @@ app.use((_,res,next)=>{
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://fonts.gstatic.com",
     "font-src 'self' https://fonts.gstatic.com",
     "img-src 'self' data: blob: https://images.unsplash.com",
-    "connect-src 'self' wss: ws: https://openrelay.metered.ca https://cdn.jsdelivr.net rtmp: https://a.upload.youtube.com",
+    "connect-src 'self' wss: ws: https://openrelay.metered.ca https://cdn.jsdelivr.net rtmp: https://a.upload.youtube.com https://stun.cloudflare.com turn: turns: stun:",
     "media-src 'self' blob:",
     "worker-src blob:",
     "frame-ancestors 'none'",

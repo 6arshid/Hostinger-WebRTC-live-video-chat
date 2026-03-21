@@ -25,6 +25,7 @@
 @media(prefers-color-scheme:light){:root{
   --bg:#eef0f8;--s1:#fff;--s2:#f4f5ff;--s3:#eaecf8;
   --border:#d0d4ee;--border2:#b8bedf;--text:#141628;
+  --muted:#555e80;--sub:#555e80;
 }}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 body{font-family:var(--ff);background:var(--bg);color:var(--text);
@@ -60,9 +61,17 @@ input.inp:focus,textarea.inp:focus{border-color:var(--accent)}
 .hh{display:flex;align-items:center;justify-content:space-between;padding:13px 22px;
   background:rgba(15,18,32,.92);border-bottom:1px solid var(--border);
   position:sticky;top:0;z-index:5;backdrop-filter:blur(16px);gap:10px}
+@media(prefers-color-scheme:light){
+  .hh{background:rgba(238,240,248,.92)}
+}
 .hh-logo{display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--text)}
 .hh-logo-ic{width:36px;height:36px;border-radius:10px;background:var(--ag);
-  display:grid;place-items:center;font-size:17px;box-shadow:0 4px 14px rgba(64,128,255,.35);flex-shrink:0}
+  display:grid;place-items:center;font-size:17px;box-shadow:0 4px 14px rgba(64,128,255,.35);flex-shrink:0;
+  border:2px solid rgba(255,255,255,.18)}
+@media(prefers-color-scheme:light){
+  .hh-logo-ic{border:2px solid rgba(64,128,255,.35)}
+  .hh-logo h1{color:#141628}
+}
 .hh-logo h1{font-size:1.15rem;font-weight:900;letter-spacing:-.4px}
 .hh-logo h1 span{color:var(--accent)}
 .hh-right{display:flex;align-items:center;gap:8px}
@@ -75,13 +84,25 @@ input.inp:focus,textarea.inp:focus{border-color:var(--accent)}
 .home-body{max-width:900px;margin:0 auto;padding:0 16px 72px;width:100%}
 
 /* hero */
-.hero{padding:70px 0 52px;text-align:center;position:relative;overflow:hidden}
+.hero{
+  padding:0 24px;
+  text-align:center;
+  position:relative;
+  overflow:hidden;
+  width:100%;
+  min-height:calc(100dvh - var(--hdr));
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:0;
+}
 .hero::before{content:'';position:absolute;inset:0;pointer-events:none;
-  background:radial-gradient(ellipse 90% 60% at 50% -5%,rgba(64,128,255,.12),transparent 70%),
-    radial-gradient(ellipse 40% 30% at 15% 100%,rgba(124,77,255,.08),transparent),
-    radial-gradient(ellipse 35% 25% at 85% 90%,rgba(6,182,212,.07),transparent);}
-.hero::after{content:'';position:absolute;width:700px;height:700px;border-radius:50%;
-  background:radial-gradient(circle,rgba(64,128,255,.05),transparent 70%);
+  background:radial-gradient(ellipse 100% 70% at 50% -5%,rgba(64,128,255,.15),transparent 70%),
+    radial-gradient(ellipse 50% 40% at 0% 100%,rgba(124,77,255,.1),transparent),
+    radial-gradient(ellipse 45% 35% at 100% 90%,rgba(6,182,212,.09),transparent);}
+.hero::after{content:'';position:absolute;width:900px;height:900px;border-radius:50%;
+  background:radial-gradient(circle,rgba(64,128,255,.07),transparent 70%);
   top:50%;left:50%;transform:translate(-50%,-65%);pointer-events:none;
   animation:glow 9s ease-in-out infinite alternate}
 @keyframes glow{to{transform:translate(-50%,-60%) scale(1.15)}}
@@ -94,10 +115,10 @@ input.inp:focus,textarea.inp:focus{border-color:var(--accent)}
 .hl{background:var(--ag);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
 .hero-sub{font-size:clamp(.88rem,2vw,1.06rem);color:var(--sub);line-height:1.8;
   max-width:520px;margin:0 auto 34px;animation:fu .6s .16s ease both}
-.hero-cta{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-bottom:48px;
+.hero-cta{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-bottom:44px;
   animation:fu .6s .22s ease both}
 .hero-cta .btn{padding:13px 28px;font-size:.93rem;border-radius:13px}
-.hero-stats{display:flex;gap:28px;justify-content:center;flex-wrap:wrap;margin-bottom:0;
+.hero-stats{display:flex;gap:28px;justify-content:center;flex-wrap:wrap;
   animation:fu .6s .28s ease both}
 .stat .num{font-size:1.5rem;font-weight:900;background:var(--ag);
   -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
@@ -375,6 +396,13 @@ input.inp:focus,textarea.inp:focus{border-color:var(--accent)}
   cursor:pointer;font-size:.58rem;display:none;place-items:center;transition:background .18s}
 .tile:hover .pip-btn{display:grid}
 .pip-btn:hover{background:rgba(64,128,255,.7)}
+.watch-btn{position:absolute;top:5px;left:32px;width:22px;height:22px;border-radius:6px;
+  background:rgba(0,0,0,.55);backdrop-filter:blur(4px);border:none;color:#fff;
+  cursor:pointer;font-size:.65rem;display:none;place-items:center;transition:background .18s;z-index:10}
+.tile:hover .watch-btn{display:grid}
+.watch-btn:hover{background:rgba(64,128,255,.7)}
+.watch-btn.hidden-active{display:grid!important;background:rgba(220,38,38,.7)}
+.watch-btn.hidden-active:hover{background:rgba(220,38,38,.9)}
 
 /* right panels */
 .rpanel{width:var(--chat);background:var(--s1);border-left:1px solid var(--border);
@@ -530,7 +558,7 @@ input.inp:focus,textarea.inp:focus{border-color:var(--accent)}
    RESPONSIVE
 ════════════════════════════════════════════════ */
 @media(max-width:780px){
-  :root{--chat:100vw;--parts:100vw;--hdr:52px;--ctrl:58px}
+  :root{--chat:100vw;--parts:100vw;--hdr:52px;--ctrl:70px}
   .features{grid-template-columns:1fr 1fr}
   .steps{grid-template-columns:1fr}
   .sec-grid{grid-template-columns:1fr}
@@ -539,8 +567,19 @@ input.inp:focus,textarea.inp:focus{border-color:var(--accent)}
     width:var(--chat)!important;border-radius:16px 16px 0 0;opacity:1!important;
     border-top:1px solid var(--border);border-left:none!important;border-right:none!important}
   .rpanel.h{height:0!important;width:0!important;overflow:hidden!important}
+  /* Mobile ctrl: circular icon-only buttons */
+  .cb{
+    width:46px;height:46px;min-width:46px;
+    border-radius:50%;
+    padding:0;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:0;
+  }
+  .cb .ico{font-size:1.25rem}
   .cb span:last-child{display:none}
-  .cb{padding:5px 8px;min-width:38px}
+  .ctrl{gap:8px;padding:0 12px;height:var(--ctrl)}
+  /* Big red mic/cam off buttons stay prominent */
+  .cb.off{background:rgba(239,68,68,.15);border-color:rgba(239,68,68,.4)}
   .mrname{display:none}
   .csep{display:none}
   .hinv-id{max-width:58px}
@@ -549,8 +588,9 @@ input.inp:focus,textarea.inp:focus{border-color:var(--accent)}
   .features{grid-template-columns:1fr}
   .hero-stats{gap:12px}
   .mhdr-l .mlogo{display:none}
-  .cb{min-width:34px;padding:5px 6px}
-  .ctrl{gap:3px;padding:0 5px}
+  .cb{width:42px;height:42px;min-width:42px}
+  .cb .ico{font-size:1.15rem}
+  .ctrl{gap:6px;padding:0 8px}
   .hero h2{font-size:1.75rem}
 }
 </style>
@@ -575,23 +615,24 @@ input.inp:focus,textarea.inp:focus{border-color:var(--accent)}
     </div>
   </nav>
 
+  <!-- HERO — full width, outside home-body -->
+  <section class="hero">
+    <div class="hero-pill" id="heroPill">📹 بدون نصب · بدون ثبت‌نام · کاملاً رایگان</div>
+    <h2><span data-i="heroH">جلسه آنلاین با</span><br/><span class="hl">Mulle — موله</span></h2>
+    <p class="hero-sub" data-i="tagline">تماس ویدیویی گروهی امن، سریع و ساده</p>
+    <div class="hero-cta">
+      <button class="btn btn-p" onclick="openCreate()"><span data-i="createRoom">ساخت اتاق</span></button>
+      <button class="btn btn-g" onclick="openJoin()"><span data-i="joinRoom">ورود به اتاق</span></button>
+    </div>
+    <div class="hero-stats">
+      <div class="stat"><div class="num">10</div><div class="lbl" data-i="heroStatPeers">نفر در هر اتاق</div></div>
+      <div class="stat"><div class="num">∞</div><div class="lbl" data-i="heroStatRooms">اتاق همزمان</div></div>
+      <div class="stat"><div class="num">24h</div><div class="lbl" data-i="heroStatH">پشتیبانی جلسه</div></div>
+      <div class="stat"><div class="num">E2E</div><div class="lbl" data-i="heroStatEnc">رمزنگاری</div></div>
+    </div>
+  </section>
+
   <div class="home-body">
-    <!-- HERO -->
-    <section class="hero">
-      <div class="hero-pill" id="heroPill">📹 بدون نصب · بدون ثبت‌نام · کاملاً رایگان</div>
-      <h2><span data-i="heroH">جلسه آنلاین با</span><br/><span class="hl">Mulle — موله</span></h2>
-      <p class="hero-sub" data-i="tagline">تماس ویدیویی گروهی امن، سریع و ساده</p>
-      <div class="hero-cta">
-        <button class="btn btn-p" onclick="openCreate()"><span data-i="createRoom">ساخت اتاق</span></button>
-        <button class="btn btn-g" onclick="openJoin()"><span data-i="joinRoom">ورود به اتاق</span></button>
-      </div>
-      <div class="hero-stats">
-        <div class="stat"><div class="num">10</div><div class="lbl" data-i="heroStatPeers">نفر در هر اتاق</div></div>
-        <div class="stat"><div class="num">∞</div><div class="lbl" data-i="heroStatRooms">اتاق همزمان</div></div>
-        <div class="stat"><div class="num">24h</div><div class="lbl" data-i="heroStatH">پشتیبانی جلسه</div></div>
-        <div class="stat"><div class="num">E2E</div><div class="lbl" data-i="heroStatEnc">رمزنگاری</div></div>
-      </div>
-    </section>
 
     <!-- FEATURES -->
     <div class="sh" data-i="featTitle">امکانات</div>
@@ -833,8 +874,10 @@ input.inp:focus,textarea.inp:focus{border-color:var(--accent)}
 
 <!-- Leave Modal -->
 <div class="mbg h" id="leaveModal">
-  <div class="mc"><div class="emo">⚠️</div><h2 data-i="leaveTitle">خروج از اتاق</h2>
-    <p data-i="leaveDesc">شما مدیر هستید. ۱۰ دقیقه بعد از خروج، اتاق حذف می‌شود.</p>
+  <div class="mc">
+    <div class="emo">🚪</div>
+    <h2 data-i="leaveTitle">خروج از اتاق</h2>
+    <p id="leaveDesc" data-i="leaveDesc">آیا می‌خواهید از اتاق خارج شوید؟</p>
     <div class="mc-btns">
       <button class="mb" onclick="closeModal('leaveModal')" data-i="leaveStay">ماندن</button>
       <button class="mb danger" onclick="confirmLeave()" data-i="leaveConfirm">خروج</button>
