@@ -1,7 +1,6 @@
 <div align="center">
 
-# 📹 Mulle — موله
-
+# 📹
 **تماس ویدیویی گروهی امن | Secure Group Video Calls**
 
 [![Node.js](https://img.shields.io/badge/Node.js-18%2B-green)](https://nodejs.org)
