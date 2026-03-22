@@ -16,122 +16,6 @@
 
 ---
 
-## 🇬🇧 English
-
-### About
-
-**Mulle** is an open-source group video calling system built on Node.js.  
-No registration, no app install, end-to-end encrypted.
-
-### Features
-
-| Feature | Description |
-|---------|-------------|
-| 🎥 **HD Video & Audio** | VP9/H264 + Opus codecs, P2P |
-| 🔒 **E2E Encryption** | WebRTC DTLS/SRTP — server never sees content |
-| 🖥️ **Screen Share** | With system audio |
-| 🎨 **AI Virtual Background** | MediaPipe in-browser segmentation |
-| 📺 **YouTube Live** | Stream directly with your Stream Key |
-| ⏺️ **Session Recording** | WebM with mixed audio |
-| 👑 **Owner Controls** | Approve entry, mute, kick |
-| ⧉ **Picture in Picture** | Floating video window |
-| 🌐/🔒 **Public/Private Rooms** | Open or approval-required |
-| 🌍 **Bilingual** | Persian (FA) and English (EN) |
-| 📱 **Responsive** | Mobile, tablet, desktop |
-
-### Installation
-
-#### Requirements
-- Node.js 18+
-- Open port `3000/tcp` (or 443)
-
-#### Quick Start
-
-```bash
-git clone https://github.com/6arshid/Hostinger-WebRTC-live-video-chat.git
-cd Hostinger-WebRTC-live-video-chat
-npm install
-npm start
-```
-
-#### Hostinger Node.js Hosting
-
-```
-hPanel → Node.js:
-  Entry file: server.js
-  Node version: 18+
-  → Install Dependencies → Start
-```
-
-#### Environment Variables
-
-```bash
-PORT=3000
-SSL_CERT=/path/to/fullchain.pem
-SSL_KEY=/path/to/privkey.pem
-NODE_ENV=production
-ALLOWED_ORIGIN=https://yourdomain.com
-```
-
-### YouTube Live Streaming
-
-#### Method 1: Browser Button
-1. Join a room as owner
-2. Click **📺 Live** button
-3. Enter your **Stream Key** from YouTube Studio:
-   - `YouTube Studio` → `Go Live` → `Stream` → Copy stream key
-4. Click **▶ Start Streaming**
-
-> **Note:** Browsers cannot push RTMP directly. Use Method 2 for actual streaming.
-
-#### Method 2: ffmpeg (Recommended)
-
-```bash
-ffmpeg -f avfoundation -i "default" \
-  -c:v libx264 -preset ultrafast -b:v 2500k \
-  -c:a aac -b:a 128k \
-  -f flv rtmp://a.rtmp.youtube.com/live2/YOUR_STREAM_KEY
-```
-
-#### Method 3: OBS Studio (Easiest)
-1. Open OBS → `Settings` → `Stream` → `YouTube RTMPS`
-2. Paste your Stream Key
-3. `Add Source` → `Browser` → enter Mulle room URL
-4. Start Streaming
-
-### Security Features
-
-- ✅ Content Security Policy headers
-- ✅ X-Frame-Options: DENY (anti-clickjacking)
-- ✅ IP-based Rate Limiting
-- ✅ Input Sanitization on all socket events
-- ✅ Slug Validation (regex-enforced)
-- ✅ Signal relay restricted to room peers only
-- ✅ 64KB max WebSocket payload
-- ✅ Auto room cleanup 10min after owner leaves
-- ✅ HTTPS redirect in production mode
-
-### File Structure
-
-```
-mulle/
-├── server.js          ← Secure signaling server
-├── package.json       ← express + socket.io only
-└── public/
-    ├── index.html     ← Bilingual UI (FA/EN)
-    ├── client.js      ← WebRTC + YouTube Live + Virtual BG
-    └── i18n.js        ← Translation strings
-```
-
-### Tech Stack
-
-- **Backend:** Node.js + Express + Socket.IO
-- **Video:** WebRTC (browser-native)
-- **Virtual BG:** MediaPipe Selfie Segmentation
-- **Fonts:** Vazirmatn (FA) + Inter (EN)
-- **No native binaries** — works on any Node.js hosting
-
----
 ## 🇮🇷 فارسی
 
 ### معرفی
@@ -248,6 +132,122 @@ mulle/
 
 ---
 
+## 🇬🇧 English
+
+### About
+
+**Mulle** is an open-source group video calling system built on Node.js.  
+No registration, no app install, end-to-end encrypted.
+
+### Features
+
+| Feature | Description |
+|---------|-------------|
+| 🎥 **HD Video & Audio** | VP9/H264 + Opus codecs, P2P |
+| 🔒 **E2E Encryption** | WebRTC DTLS/SRTP — server never sees content |
+| 🖥️ **Screen Share** | With system audio |
+| 🎨 **AI Virtual Background** | MediaPipe in-browser segmentation |
+| 📺 **YouTube Live** | Stream directly with your Stream Key |
+| ⏺️ **Session Recording** | WebM with mixed audio |
+| 👑 **Owner Controls** | Approve entry, mute, kick |
+| ⧉ **Picture in Picture** | Floating video window |
+| 🌐/🔒 **Public/Private Rooms** | Open or approval-required |
+| 🌍 **Bilingual** | Persian (FA) and English (EN) |
+| 📱 **Responsive** | Mobile, tablet, desktop |
+
+### Installation
+
+#### Requirements
+- Node.js 18+
+- Open port `3000/tcp` (or 443)
+
+#### Quick Start
+
+```bash
+git clone https://github.com/6arshid/Hostinger-WebRTC-live-video-chat.git
+cd Hostinger-WebRTC-live-video-chat
+npm install
+npm start
+```
+
+#### Hostinger Node.js Hosting
+
+```
+hPanel → Node.js:
+  Entry file: server.js
+  Node version: 18+
+  → Install Dependencies → Start
+```
+
+#### Environment Variables
+
+```bash
+PORT=3000
+SSL_CERT=/path/to/fullchain.pem
+SSL_KEY=/path/to/privkey.pem
+NODE_ENV=production
+ALLOWED_ORIGIN=https://yourdomain.com
+```
+
+### YouTube Live Streaming
+
+#### Method 1: Browser Button
+1. Join a room as owner
+2. Click **📺 Live** button
+3. Enter your **Stream Key** from YouTube Studio:
+   - `YouTube Studio` → `Go Live` → `Stream` → Copy stream key
+4. Click **▶ Start Streaming**
+
+> **Note:** Browsers cannot push RTMP directly. Use Method 2 for actual streaming.
+
+#### Method 2: ffmpeg (Recommended)
+
+```bash
+ffmpeg -f avfoundation -i "default" \
+  -c:v libx264 -preset ultrafast -b:v 2500k \
+  -c:a aac -b:a 128k \
+  -f flv rtmp://a.rtmp.youtube.com/live2/YOUR_STREAM_KEY
+```
+
+#### Method 3: OBS Studio (Easiest)
+1. Open OBS → `Settings` → `Stream` → `YouTube RTMPS`
+2. Paste your Stream Key
+3. `Add Source` → `Browser` → enter Mulle room URL
+4. Start Streaming
+
+### Security Features
+
+- ✅ Content Security Policy headers
+- ✅ X-Frame-Options: DENY (anti-clickjacking)
+- ✅ IP-based Rate Limiting
+- ✅ Input Sanitization on all socket events
+- ✅ Slug Validation (regex-enforced)
+- ✅ Signal relay restricted to room peers only
+- ✅ 64KB max WebSocket payload
+- ✅ Auto room cleanup 10min after owner leaves
+- ✅ HTTPS redirect in production mode
+
+### File Structure
+
+```
+mulle/
+├── server.js          ← Secure signaling server
+├── package.json       ← express + socket.io only
+└── public/
+    ├── index.html     ← Bilingual UI (FA/EN)
+    ├── client.js      ← WebRTC + YouTube Live + Virtual BG
+    └── i18n.js        ← Translation strings
+```
+
+### Tech Stack
+
+- **Backend:** Node.js + Express + Socket.IO
+- **Video:** WebRTC (browser-native)
+- **Virtual BG:** MediaPipe Selfie Segmentation
+- **Fonts:** Vazirmatn (FA) + Inter (EN)
+- **No native binaries** — works on any Node.js hosting
+
+---
 
 ## License
 
@@ -262,3 +262,45 @@ Made with ❤️ by [6arshid](https://github.com/6arshid/) | [GitHub Profile](ht
 ⭐ **Star this repo** if you find it useful!
 
 </div>
+
+---
+
+## 🔧 رفع مشکل اتصال بین IP‌های مختلف (TURN Server)
+
+### مشکل
+اگر دو نفر از IP‌های مختلف (شبکه‌های مختلف) به هم وصل نمیشن، نیاز به **TURN server** دارید.
+
+### راه‌حل ۱ — رایگان: metered.ca (توصیه شده)
+1. به [metered.ca](https://www.metered.ca/tools/openrelay/) بروید
+2. ثبت‌نام کنید و API Key بگیرید
+3. در سرور:
+```bash
+export METERED_API_KEY=your_api_key_here
+node server.js
+```
+
+### راه‌حل ۲ — سرور خودتان: coturn
+```bash
+# نصب روی Ubuntu/Debian
+apt install coturn
+
+# فایل /etc/turnserver.conf:
+listening-port=3478
+tls-listening-port=5349
+realm=yourdomain.com
+server-name=yourdomain.com
+lt-cred-mech
+user=myuser:mypassword
+cert=/etc/ssl/certs/turn.pem
+pkey=/etc/ssl/private/turn.key
+```
+```bash
+# در سرور Mulle:
+export TURN_URL=yourdomain.com
+export TURN_USER=myuser
+export TURN_PASS=mypassword
+node server.js
+```
+
+### راه‌حل ۳ — Cloudflare TURN (بزودی)
+Cloudflare یک سرویس TURN رایگان ارائه میدهد.

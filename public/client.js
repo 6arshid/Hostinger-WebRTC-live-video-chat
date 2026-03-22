@@ -248,6 +248,7 @@ function initSocket(pub){
   });
 
   socket.on("rooms:list",renderRooms);
+  initRelayReceiver();
 
   let connectErrCount=0;
   socket.on("connect_error",(err)=>{
@@ -327,7 +328,9 @@ function initSocket(pub){
   socket.on("peer:new",({peerId,name,avatar})=>{
     sysMsg(`${name} ${window.currentLang==="fa"?"وارد شد":"joined"}`);
     addPeerTile(peerId,name,avatar,false);
-    createPC(peerId,name,avatar,false,true);
+    // Existing peers do NOT send offer — the new joiner sends offer to us
+    // We wait for the offer and respond with answer (iOffer=false)
+    createPC(peerId,name,avatar,false);
     updatePartList();
   });
   socket.on("peer:left",({peerId})=>{
@@ -389,11 +392,14 @@ function onJoined({isOwner,roomName,existingPeers}){
 
   // Use requestAnimationFrame to ensure DOM is painted before adding tiles
   requestAnimationFrame(()=>{
+    // Clear grid and peer state before (re)building to prevent duplicates
+    const g=$("grid");if(g)g.innerHTML="";
+    peers.forEach((ep,pid)=>{stopRelayMode(pid);try{ep.pc.close();}catch{}});peers.clear();relayStreams.clear();
     addLocalTile();
-    existingPeers.forEach(p=>{
-      addPeerTile(p.id,p.name,p.avatar,p.isOwner);
-      createPC(p.id,p.name,p.avatar,p.isOwner,false);
-    });
+    // Add tiles first so DOM elements exist before tracks arrive
+    existingPeers.forEach(p=>addPeerTile(p.id,p.name,p.avatar,p.isOwner));
+    // New joiner sends offer to existing peers (iOffer=true)
+    existingPeers.forEach(p=>createPC(p.id,p.name,p.avatar,p.isOwner));
     updatePartList();
     if(curBg!=="none")loadSeg().then(()=>startBgLoop());
     console.log("[mulle] Room ready — peers:",existingPeers.length);
@@ -401,97 +407,212 @@ function onJoined({isOwner,roomName,existingPeers}){
 }
 
 // ─── WebRTC ───────────────────────────────────────────────────────────────────
+// ─── WebRTC + Socket Relay Engine ────────────────────────────────────────────
+// Strategy:
+//  1. Try WebRTC P2P with STUN (works on same network / open NAT)
+//  2. If ICE fails → try relay via Socket.IO (works on ALL networks, no TURN needed)
+//    Relay mode: MediaRecorder → ArrayBuffer chunks → socket → remote video
+
 let ICE_CFG=[
   {urls:"stun:stun.l.google.com:19302"},
   {urls:"stun:stun1.l.google.com:19302"},
-  {urls:"stun:stun2.l.google.com:19302"},
-  {urls:"turn:openrelay.metered.ca:80",username:"openrelayproject",credential:"openrelayproject"},
-  {urls:"turn:openrelay.metered.ca:443",username:"openrelayproject",credential:"openrelayproject"},
-  {urls:"turns:openrelay.metered.ca:443",username:"openrelayproject",credential:"openrelayproject"},
-  {urls:"turn:openrelay.metered.ca:443?transport=tcp",username:"openrelayproject",credential:"openrelayproject"},
+  {urls:"stun:stun.cloudflare.com:3478"},
 ];
 
-function createPC(pid,name,avatar,isOwner,iOffer){
-  if(peers.has(pid))return peers.get(pid).pc;
-  const pc=new RTCPeerConnection({
-    iceServers:ICE_CFG,
-    bundlePolicy:"max-bundle",
-    iceTransportPolicy:"all",
-  });
-  peers.set(pid,{pc,name,avatar,isOwner,iceBuf:[]});
-  localStream.getTracks().forEach(t=>pc.addTrack(t,localStream));
-  if(screenStream)screenStream.getTracks().forEach(t=>pc.addTrack(t,screenStream));
-
-  pc.onicecandidate=({candidate})=>{
-    if(candidate)socket.emit("signal",{to:pid,payload:{type:"candidate",candidate}});
-  };
-  pc.onicecandidateerror=(e)=>{
-    if(e.errorCode!==701)console.warn("[ICE error]",e.errorCode,e.errorText,e.url);
-  };
-  pc.oniceconnectionstatechange=()=>{
-    const st=pc.iceConnectionState;
-    console.log(`[ICE ${pid.slice(0,6)}]`,st);
-    if(st==="failed"){
-      console.warn("[ICE] failed — restarting");
-      if(iOffer){pc.restartIce();doOffer(pid);}
-      else pc.restartIce();
-    }
-    if(st==="disconnected"){
-      // give it 5s to recover before restart
-      setTimeout(()=>{if(pc.iceConnectionState==="disconnected"){pc.restartIce();}},5000);
-    }
-  };
-  pc.onconnectionstatechange=()=>{
-    console.log(`[PC ${pid.slice(0,6)}]`,pc.connectionState);
-  };
-  pc.ontrack=({track,streams})=>{
-    const tile=document.getElementById(`t-${pid}`);if(!tile)return;
+// ── Attach incoming stream to tile ──────────────────────────────────────────
+function attachStreamToTile(pid, track, streams){
+  const go=(n=0)=>{
+    const tile=document.getElementById("t-"+pid);
+    if(!tile){ if(n<40)setTimeout(()=>go(n+1),100); return; }
     const vid=tile.querySelector("video");
-    // Use streams[0] if available, otherwise build manually
+    vid.autoplay=true; vid.playsInline=true;
     if(streams&&streams[0]){
-      if(vid.srcObject!==streams[0])vid.srcObject=streams[0];
+      if(vid.srcObject!==streams[0]) vid.srcObject=streams[0];
     }else{
-      if(!vid.srcObject)vid.srcObject=new MediaStream();
+      if(!vid.srcObject) vid.srcObject=new MediaStream();
       vid.srcObject.addTrack(track);
     }
     vid.play().catch(()=>{});
     if(track.kind==="video"){
-      tile.querySelector(".tile-av")?.classList.add("h");
-      // ensure video plays when it becomes active
-      track.onunmute=()=>{vid.play().catch(()=>{});tile.querySelector(".tile-av")?.classList.add("h");};
+      const showVid=()=>tile.querySelector(".tile-av")?.classList.add("h");
+      showVid();
+      track.onunmute=()=>{vid.play().catch(()=>{}); showVid();};
     }
   };
-  if(iOffer)setTimeout(()=>doOffer(pid),150);
+  go();
+}
+
+// ── Socket Relay: Canvas-based video relay via Socket.IO ────────────────────
+// Works on ALL networks without TURN. Uses JPEG frames over WebSocket.
+const relayStreams = new Map(); // pid → {interval, canvas, ctx}
+const relayFPS = 15;
+
+function startRelayMode(pid){
+  const ep=peers.get(pid); if(!ep||ep.relayMode) return;
+  ep.relayMode=true;
+  console.log("[relay] Starting canvas relay for",pid);
+
+  // --- SEND side: start global relay loop if not running ---
+  relayStreams.set(pid,{active:true});
+  _ensureRelaySendLoop();
+
+  // --- RECEIVE side: show incoming JPEG frames on peer canvas ---
+  _setupRelayCanvas(pid);
+  toast("🔄 اتصال از طریق سرور برقرار شد",4000);
+}
+
+function _setupRelayCanvas(pid){
+  const go=(n=0)=>{
+    const tile=document.getElementById("t-"+pid); if(!tile){ if(n<30)setTimeout(()=>go(n+1),200); return; }
+    const vid=tile.querySelector("video"); vid.style.display="none";
+    tile.querySelector(".tile-av")?.classList.add("h");
+
+    let cv=tile.querySelector("canvas.relay-cv");
+    if(!cv){
+      cv=document.createElement("canvas");
+      cv.className="relay-cv";
+      cv.style.cssText="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#000;";
+      tile.style.position="relative"; tile.style.overflow="hidden";
+      tile.appendChild(cv);
+    }
+    relayStreams.set(pid+"_canvas",cv);
+  };
+  go();
+}
+
+// One shared loop that sends frames to ALL active relay peers
+let _relaySendLoopId=null;
+function _ensureRelaySendLoop(){
+  if(_relaySendLoopId) return;
+  const localVid=document.querySelector("#t-local video");
+  const cv=document.createElement("canvas"); cv.width=320; cv.height=240;
+  const ctx=cv.getContext("2d");
+  _relaySendLoopId=setInterval(()=>{
+    if(!localVid||localVid.readyState<2) return;
+    // check if any relay peers exist
+    let hasRelay=false;
+    peers.forEach(ep=>{ if(ep.relayMode) hasRelay=true; });
+    if(!hasRelay){ clearInterval(_relaySendLoopId); _relaySendLoopId=null; return; }
+    ctx.drawImage(localVid,0,0,320,240);
+    cv.toBlob(blob=>{
+      if(!blob||!socket?.connected) return;
+      blob.arrayBuffer().then(buf=>{
+        peers.forEach((ep,pid2)=>{
+          if(ep.relayMode && socket.connected)
+            socket.emit("relay:chunk",{to:pid2,chunk:buf});
+        });
+      });
+    },"image/jpeg",0.6);
+  },1000/relayFPS);
+}
+
+function initRelayReceiver(){
+  socket.on("relay:chunk",({from,chunk})=>{
+    const cv=relayStreams.get(from+"_canvas");
+    if(!cv) return;
+    const blob=new Blob([chunk],{type:"image/jpeg"});
+    createImageBitmap(blob).then(bmp=>{
+      cv.width=bmp.width; cv.height=bmp.height;
+      cv.getContext("2d").drawImage(bmp,0,0);
+      bmp.close();
+      // keep tile-av hidden
+      const tile=document.getElementById("t-"+from);
+      tile?.querySelector(".tile-av")?.classList.add("h");
+    }).catch(()=>{});
+  });
+}
+
+function stopRelayMode(pid){
+  relayStreams.delete(pid);
+  relayStreams.delete(pid+"_canvas");
+  const ep=peers.get(pid); if(ep) ep.relayMode=false;
+}
+
+// ── Create WebRTC PeerConnection ─────────────────────────────────────────────
+function createPC(pid,name,avatar,isOwner){
+  if(peers.has(pid))return peers.get(pid).pc;
+
+  const polite=myId<pid;
+  const pc=new RTCPeerConnection({iceServers:ICE_CFG, bundlePolicy:"max-bundle"});
+
+  let makingOffer=false;
+  peers.set(pid,{pc,name,avatar,isOwner,iceBuf:[],polite,
+    makingOffer:()=>makingOffer, relayMode:false});
+
+  localStream.getTracks().forEach(t=>pc.addTrack(t,localStream));
+  if(screenStream) screenStream.getTracks().forEach(t=>pc.addTrack(t,screenStream));
+
+  pc.onnegotiationneeded=async()=>{
+    try{
+      makingOffer=true;
+      await pc.setLocalDescription();
+      socket.emit("signal",{to:pid,payload:{type:"offer",sdp:pc.localDescription}});
+    }catch(e){console.error("[nego]",e);}
+    finally{makingOffer=false;}
+  };
+
+  pc.onicecandidate=({candidate})=>{
+    if(candidate) socket.emit("signal",{to:pid,payload:{type:"candidate",candidate}});
+  };
+
+  let fails=0;
+  pc.oniceconnectionstatechange=()=>{
+    const st=pc.iceConnectionState;
+    console.log("[ICE "+pid.slice(0,6)+"]",st);
+    if(st==="failed"){
+      fails++;
+      if(fails===1){ pc.restartIce(); }
+      else {
+        // P2P failed — switch to socket relay
+        console.warn("[ICE] P2P failed, switching to relay");
+        startRelayMode(pid);
+      }
+    }
+    if(st==="disconnected")
+      setTimeout(()=>{if(pc.iceConnectionState==="disconnected") pc.restartIce();},5000);
+  };
+
+  pc.onconnectionstatechange=()=>console.log("[PC "+pid.slice(0,6)+"]",pc.connectionState);
+  pc.ontrack=({track,streams})=>attachStreamToTile(pid,track,streams);
+
   return pc;
 }
-async function doOffer(pid){
-  const e=peers.get(pid);if(!e)return;
-  try{
-    const o=await e.pc.createOffer({offerToReceiveAudio:true,offerToReceiveVideo:true});
-    await e.pc.setLocalDescription(o);
-    socket.emit("signal",{to:pid,payload:{type:"offer",sdp:e.pc.localDescription}});
-  }catch(err){console.error("doOffer:",err);}
-}
+
 async function handleSignal(from,payload){
-  if(!peers.has(from)&&payload.type==="offer"){addPeerTile(from,"?","👤",false);createPC(from,"?","👤",false,false);}
-  const e=peers.get(from);if(!e)return;const{pc}=e;
+  if(!peers.has(from)&&payload.type==="offer"){
+    addPeerTile(from,"?","👤",false);
+    createPC(from,"?","👤",false);
+  }
+  const e=peers.get(from); if(!e) return;
+  const{pc,polite}=e;
+  let ignoreOffer=false;
+
   try{
     if(payload.type==="offer"){
+      const collision=pc.signalingState!=="stable"||e.makingOffer();
+      ignoreOffer=!polite&&collision;
+      if(ignoreOffer) return;
+      if(collision) await pc.setLocalDescription({type:"rollback"});
       await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
-      for(const c of e.iceBuf)await pc.addIceCandidate(new RTCIceCandidate(c)).catch(()=>{});e.iceBuf=[];
-      const a=await pc.createAnswer();await pc.setLocalDescription(a);
+      await pc.setLocalDescription();
       socket.emit("signal",{to:from,payload:{type:"answer",sdp:pc.localDescription}});
     }else if(payload.type==="answer"){
       await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
-      for(const c of e.iceBuf)await pc.addIceCandidate(new RTCIceCandidate(c)).catch(()=>{});e.iceBuf=[];
     }else if(payload.type==="candidate"){
-      if(pc.remoteDescription)await pc.addIceCandidate(new RTCIceCandidate(payload.candidate)).catch(()=>{});
+      if(pc.remoteDescription)
+        await pc.addIceCandidate(new RTCIceCandidate(payload.candidate)).catch(()=>{});
       else e.iceBuf.push(payload.candidate);
+    }
+    // flush buffered candidates
+    if(e.iceBuf?.length&&pc.remoteDescription){
+      for(const c of e.iceBuf) await pc.addIceCandidate(new RTCIceCandidate(c)).catch(()=>{});
+      e.iceBuf=[];
     }
   }catch(err){console.error("handleSignal:",err);}
 }
+
 function closePeer(pid){
-  const e=peers.get(pid);if(e){try{e.pc.close();}catch{}peers.delete(pid);}
+  const e=peers.get(pid);if(e){stopRelayMode(pid);try{e.pc.close();}catch{}peers.delete(pid);}
   // If this peer was pinned, unpin
   if(pinnedPeerId===pid){applyPin(null);if(amOwner)socket?.emit("owner:pin",{peerId:null});}
   document.getElementById(`t-${pid}`)?.remove();document.getElementById(`ts-${pid}`)?.remove();updateGrid();}
@@ -504,6 +625,8 @@ function updatePeerMedia(pid,kind,enabled){
 
 // ─── TILES ────────────────────────────────────────────────────────────────────
 function addLocalTile(){
+  // Remove any existing local tile to prevent duplicates
+  document.getElementById("t-local")?.remove();
   const tile=mkTile("local",myName+(window.currentLang==="fa"?" (شما)":" (You)"),"👤",true,false,amOwner);
   tile.classList.add("me");
   const vid=tile.querySelector("video");
@@ -962,6 +1085,7 @@ function answerKnock(admit){if(!pendingKnock)return;socket.emit("knock:answer",{
 function cancelKnock(){socket?.disconnect();location.href=location.pathname;}
 function copyInvite(){navigator.clipboard.writeText(inviteURL(myRoom)).then(()=>toast(L().toastCopied));}
 
+
 // ─── LEAVE ────────────────────────────────────────────────────────────────────
 function leave(){
   const desc=$("leaveDesc");
@@ -978,7 +1102,7 @@ function doLeave(disc=true){
   if(ytStreaming)stopYtStream();
   stopScreen();stopBgLoop();
   if(disc)socket?.disconnect();
-  peers.forEach(({pc})=>{try{pc.close();}catch{}});peers.clear();
+  peers.forEach((ep,pid)=>{stopRelayMode(pid);try{ep.pc.close();}catch{}});peers.clear();relayStreams.clear();
   localStream?.getTracks().forEach(t=>t.stop());localStream=null;
   // Reset state
   myRoom=null;myName=null;myRoomName=null;amOwner=false;pinnedPeerId=null;
