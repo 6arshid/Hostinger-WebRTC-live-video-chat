@@ -580,16 +580,23 @@ function mkTile(id,name,avatar,isLocal,isScr,isOwner=false){
   // ── LOCAL-ONLY: flip camera + quality picker ──
   const tileFlipBtn=document.createElement("button");
   tileFlipBtn.className="tile-local-btn tile-flip-btn";
-  tileFlipBtn.title=window.currentLang==="fa"?"تغییر دوربین":"Switch camera";
-  tileFlipBtn.innerHTML="🔄";
-  tileFlipBtn.style.display="none"; // shown after camera enumeration
+  tileFlipBtn.title=window.currentLang==="fa"?"دوربین جلو / عقب":"Switch camera (front/back)";
+  tileFlipBtn.innerHTML=currentFacingMode==="user"?"🤳":"📷";
   tileFlipBtn.setAttribute("data-local-only","1");
-  tileFlipBtn.onclick=async(e)=>{e.stopPropagation();await switchCamera();tileFlipBtn.innerHTML=currentFacingMode==="user"?"🤳":"📷";};
+  tileFlipBtn.style.display=""; // always visible on local tile
+  tileFlipBtn.onclick=async(e)=>{
+    e.stopPropagation();
+    await switchCamera();
+    tileFlipBtn.innerHTML=currentFacingMode==="user"?"🤳":"📷";
+    tileFlipBtn.title=window.currentLang==="fa"
+      ?(currentFacingMode==="user"?"دوربین جلو — کلیک برای عقب":"دوربین عقب — کلیک برای جلو")
+      :(currentFacingMode==="user"?"Front camera — click to switch":"Back camera — click to switch");
+  };
 
   const tileQualBtn=document.createElement("button");
   tileQualBtn.className="tile-local-btn tile-qual-btn";
   tileQualBtn.title=window.currentLang==="fa"?"کیفیت تصویر":"Video quality";
-  tileQualBtn.innerHTML="🎞️";
+  tileQualBtn.innerHTML=`<span class="qual-label">${currentQuality}</span>`;
   tileQualBtn.setAttribute("data-local-only","1");
 
   // quality popup menu
@@ -600,7 +607,14 @@ function mkTile(id,name,avatar,isLocal,isScr,isOwner=false){
     const item=document.createElement("button");
     item.className="qual-item"+(currentQuality===q.label?" active":"");
     item.textContent=q.label;
-    item.onclick=async(e)=>{e.stopPropagation();qualMenu.classList.add("h");await setVideoQuality(q.w,q.h,q.label);qualMenu.querySelectorAll(".qual-item").forEach(x=>x.classList.toggle("active",x.textContent===q.label));};
+    item.onclick=async(e)=>{
+      e.stopPropagation();
+      qualMenu.classList.add("h");
+      await setVideoQuality(q.w,q.h,q.label);
+      qualMenu.querySelectorAll(".qual-item").forEach(x=>x.classList.toggle("active",x.textContent===q.label));
+      const ql=tileQualBtn.querySelector(".qual-label");
+      if(ql)ql.textContent=q.label;
+    };
     qualMenu.appendChild(item);
   });
   tileQualBtn.onclick=(e)=>{e.stopPropagation();qualMenu.classList.toggle("h");};

@@ -467,34 +467,38 @@ input.inp:focus,textarea.inp:focus{border-color:var(--accent)}
 /* ── local tile action buttons (flip + quality) ── */
 .tile-local-btn{
   position:absolute;bottom:32px;
-  width:28px;height:28px;border-radius:8px;
-  background:rgba(0,0,0,.6);backdrop-filter:blur(6px);
-  border:1px solid rgba(255,255,255,.15);color:#fff;
-  cursor:pointer;font-size:.75rem;display:grid;place-items:center;
-  transition:background .18s,transform .15s;z-index:5;
-  box-shadow:0 2px 8px rgba(0,0,0,.4);
+  height:26px;border-radius:8px;
+  background:rgba(0,0,0,.65);backdrop-filter:blur(6px);
+  border:1px solid rgba(255,255,255,.2);color:#fff;
+  cursor:pointer;font-size:.7rem;display:grid;place-items:center;
+  transition:background .18s,transform .15s,box-shadow .15s;z-index:5;
+  box-shadow:0 2px 8px rgba(0,0,0,.5);
+  opacity:.92;padding:0 7px;min-width:26px;
 }
-.tile-local-btn:hover{background:rgba(64,128,255,.75);transform:scale(1.1)}
-.tile-flip-btn{right:36px}
-.tile-qual-btn{right:6px}
+.tile-local-btn:hover{background:rgba(64,128,255,.8);transform:scale(1.08);opacity:1;box-shadow:0 4px 14px rgba(64,128,255,.4)}
+/* flip button: icon only */
+.tile-flip-btn{right:70px;font-size:.85rem;width:28px;padding:0}
+/* quality button: shows current quality label */
+.tile-qual-btn{right:6px;font-weight:700;letter-spacing:.5px;min-width:42px}
+.qual-label{font-size:.68rem;font-weight:700;line-height:1}
 
 /* quality popup */
 .qual-menu{
-  position:absolute;bottom:65px;right:6px;
-  background:rgba(18,18,30,.92);backdrop-filter:blur(10px);
-  border:1px solid rgba(255,255,255,.15);border-radius:10px;
-  padding:5px;display:flex;flex-direction:column;gap:3px;
-  z-index:20;min-width:80px;box-shadow:0 4px 20px rgba(0,0,0,.5);
+  position:absolute;bottom:62px;right:6px;
+  background:rgba(14,14,26,.95);backdrop-filter:blur(12px);
+  border:1px solid rgba(255,255,255,.18);border-radius:12px;
+  padding:6px;display:flex;flex-direction:column;gap:4px;
+  z-index:20;min-width:88px;box-shadow:0 8px 28px rgba(0,0,0,.6);
 }
 .qual-menu.h{display:none}
 .qual-item{
-  background:transparent;border:none;color:#e2e8f0;
-  padding:6px 12px;border-radius:7px;cursor:pointer;
-  font-size:.75rem;font-weight:600;text-align:center;
-  transition:background .15s;
+  background:transparent;border:none;color:#cbd5e1;
+  padding:7px 14px;border-radius:8px;cursor:pointer;
+  font-size:.78rem;font-weight:700;text-align:center;
+  transition:background .15s,color .15s;
 }
-.qual-item:hover{background:rgba(99,102,241,.5)}
-.qual-item.active{background:rgba(99,102,241,.75);color:#fff}
+.qual-item:hover{background:rgba(99,102,241,.45);color:#fff}
+.qual-item.active{background:rgba(99,102,241,.8);color:#fff;box-shadow:0 2px 8px rgba(99,102,241,.3)}
 
 /* right panels */
 .rpanel{width:var(--chat);background:var(--s1);border-left:1px solid var(--border);
