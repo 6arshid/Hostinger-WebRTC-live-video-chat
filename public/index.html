@@ -565,7 +565,7 @@ input.inp:focus,textarea.inp:focus{border-color:var(--accent)}
 .ctrl-qual-item:hover,.ctrl-qual-item:active{background:rgba(99,102,241,.5);color:#fff}
 .ctrl-qual-item.active{background:rgba(99,102,241,.85);color:#fff}
 /* on mobile: hide this ctrl button (tile overlay handles it) */
-@media(max-width:780px){.ctrl-qual-wrap{display:none}}
+/* ctrl-qual-wrap shown on all screen sizes */
 
 /* right panels */
 .rpanel{width:var(--chat);background:var(--s1);border-left:1px solid var(--border);
@@ -760,6 +760,7 @@ input.inp:focus,textarea.inp:focus{border-color:var(--accent)}
   }
   .cb .ico{font-size:1.25rem}
   .cb span:last-child{display:none}
+  #ctrlQualBtn span{display:flex!important}
   .ctrl{gap:8px;padding:0 12px;height:var(--ctrl)}
   .cb.off{background:rgba(239,68,68,.15);border-color:rgba(239,68,68,.4)}
   .mrname{display:none}
