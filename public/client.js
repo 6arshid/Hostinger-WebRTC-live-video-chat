@@ -900,10 +900,10 @@ function uploadBg(e){const f=e.target.files[0];if(!f)return;applyBg("custom",URL
 function uploadBgRoom(e){const f=e.target.files[0];if(!f)return;applyBg("custom",URL.createObjectURL(f));closeModal("bgModal");}
 function applyBg(key,url){
   if(key==="none"){curBg="none";bgImg=null;stopBgLoop();return;}
-  if(key==="blur"){curBg="blur";bgImg=null;stopBgLoop();loadSeg().then(()=>startBgLoop());return;}
+  if(key==="blur"){stopBgLoop(false);curBg="blur";bgImg=null;loadSeg().then(()=>startBgLoop());return;}
   const u=url||(BG_URLS[key]||null);if(!u)return;curBg=u;
   const img=new Image();img.crossOrigin="anonymous";
-  img.onload=()=>{bgImg=img;stopBgLoop();loadSeg().then(()=>startBgLoop());};img.src=u;
+  img.onload=()=>{bgImg=img;stopBgLoop(false);loadSeg().then(()=>startBgLoop());};img.src=u;
 }
 async function startBgLoop(){
   if(bgAnimId)return;
@@ -912,33 +912,60 @@ async function startBgLoop(){
   if(!cv){cv=document.createElement("canvas");cv.className="bgc";tile.appendChild(cv);}
   bgCanvas=cv;bgCtx=cv.getContext("2d");
   if(!bgMask){bgMask=document.createElement("canvas");bgMaskCtx=bgMask.getContext("2d");}
-  const vid=tile.querySelector("video");vid.style.opacity="0";
+  const vid=tile.querySelector("video");
+  // Don't hide video until we've drawn at least one frame — prevents black screen
+  let firstFrameDrawn=false;
+  // Fallback: if segmentation never loads in 4s, show plain video
+  const segTimeout=setTimeout(()=>{
+    if(!firstFrameDrawn){vid.style.opacity="";cv.style.display="none";}
+  },4000);
   async function draw(){
     bgAnimId=requestAnimationFrame(draw);
     if(!vid.videoWidth||vid.readyState<2)return;
     const W=vid.videoWidth,H=vid.videoHeight;
-    cv.width=W;cv.height=H;bgMask.width=W;bgMask.height=H;
+    cv.width=W;cv.height=H;
+    if(bgMask){bgMask.width=W;bgMask.height=H;}
     segSkip=(segSkip+1)%2;
     if(segSkip===0&&segReady&&seg){try{await seg.send({image:vid});}catch{}}
     if(segReady&&segResults){
       const mask=segResults.segmentationMask;
       if(curBg==="blur"){bgCtx.filter="blur(18px) brightness(.92)";bgCtx.drawImage(vid,0,0,W,H);bgCtx.filter="none";}
       else if(bgImg)bgCtx.drawImage(bgImg,0,0,W,H);
-      bgMaskCtx.clearRect(0,0,W,H);bgMaskCtx.drawImage(mask,0,0,W,H);
-      bgMaskCtx.globalCompositeOperation="source-in";bgMaskCtx.drawImage(vid,0,0,W,H);
-      bgMaskCtx.globalCompositeOperation="source-over";bgCtx.drawImage(bgMask,0,0,W,H);
+      else{bgCtx.drawImage(vid,0,0,W,H);}
+      if(bgMask&&bgMaskCtx){
+        bgMaskCtx.clearRect(0,0,W,H);bgMaskCtx.drawImage(mask,0,0,W,H);
+        bgMaskCtx.globalCompositeOperation="source-in";bgMaskCtx.drawImage(vid,0,0,W,H);
+        bgMaskCtx.globalCompositeOperation="source-over";bgCtx.drawImage(bgMask,0,0,W,H);
+      }
+      // First good frame drawn — now safe to hide raw video
+      if(!firstFrameDrawn){
+        firstFrameDrawn=true;
+        clearTimeout(segTimeout);
+        vid.style.opacity="0";
+        cv.style.display="";
+      }
     }else{
-      if(curBg==="blur"){bgCtx.filter="blur(18px)";bgCtx.drawImage(vid,0,0,W,H);bgCtx.filter="none";bgCtx.drawImage(vid,0,0,W,H);}
-      else if(bgImg){bgCtx.drawImage(bgImg,0,0,W,H);bgCtx.globalAlpha=.88;bgCtx.drawImage(vid,0,0,W,H);bgCtx.globalAlpha=1;}
+      // Segmentation not ready yet — draw fallback so canvas is visible
+      if(curBg==="blur"){
+        bgCtx.filter="blur(18px)";bgCtx.drawImage(vid,0,0,W,H);bgCtx.filter="none";
+        bgCtx.drawImage(vid,0,0,W,H);
+      }else if(bgImg){
+        bgCtx.drawImage(bgImg,0,0,W,H);
+        bgCtx.globalAlpha=.88;bgCtx.drawImage(vid,0,0,W,H);bgCtx.globalAlpha=1;
+      }else{
+        bgCtx.drawImage(vid,0,0,W,H);
+      }
+      if(!firstFrameDrawn){firstFrameDrawn=true;clearTimeout(segTimeout);vid.style.opacity="0";cv.style.display="";}
     }
   }
   draw();
 }
-function stopBgLoop(){
+function stopBgLoop(resetBg=true){
   if(bgAnimId){cancelAnimationFrame(bgAnimId);bgAnimId=null;}
-  curBg="none";bgImg=null;
+  if(resetBg){curBg="none";bgImg=null;}
   const tile=document.getElementById("t-local");if(!tile)return;
-  tile.querySelector("canvas.bgc")?.remove();bgCanvas=null;bgCtx=null;
+  const cv=tile.querySelector("canvas.bgc");if(cv)cv.remove();
+  bgCanvas=null;bgCtx=null;
   const vid=tile.querySelector("video");if(vid)vid.style.opacity="";
 }
 
@@ -1199,50 +1226,67 @@ function showMeet(){
 // ─── VISIBILITY / RESUME HANDLER ─────────────────────────────────────────────
 async function reacquireMedia(){
   if(!localStream) return;
-  await new Promise(r=>setTimeout(r,800));
+  await new Promise(r=>setTimeout(r,600));
 
-  // 1. Resume all paused/suspended videos
+  // 1. Always try to play all paused videos first (cheapest fix)
   document.querySelectorAll("video").forEach(v=>{
-    if(v.srcObject&&(v.paused||v.readyState<2))v.play().catch(()=>{});
+    if(v.srcObject)v.play().catch(()=>{});
   });
 
-  // 2. Resume AudioContext if suspended (fixes audio cut on background)
+  // 2. Resume AudioContext if suspended
   try{
-    const AudioCtx=window.AudioContext||window.webkitAudioContext;
-    if(AudioCtx){
-      if(window._mulleAudioCtx&&window._mulleAudioCtx.state==="suspended"){
-        await window._mulleAudioCtx.resume();
-      }
+    if(window._mulleAudioCtx&&window._mulleAudioCtx.state==="suspended"){
+      await window._mulleAudioCtx.resume();
     }
   }catch(e){}
 
-  // 3. Re-enable tracks that got muted by browser in background
-  if(camOn) localStream.getVideoTracks().forEach(t=>{if(!t.enabled)t.enabled=true;});
-  if(micOn) localStream.getAudioTracks().forEach(t=>{if(!t.enabled)t.enabled=true;});
+  // 3. Re-enable tracks disabled by browser while backgrounded
+  if(camOn) localStream.getVideoTracks().forEach(t=>{t.enabled=true;});
+  if(micOn) localStream.getAudioTracks().forEach(t=>{t.enabled=true;});
 
-  // 4. Check for truly ended OR muted-by-system tracks and reacquire
-  const deadVideo=localStream.getVideoTracks().filter(t=>t.readyState==="ended"||t.muted);
-  const deadAudio=localStream.getAudioTracks().filter(t=>t.readyState==="ended"||t.muted);
-  if(deadVideo.length===0&&deadAudio.length===0) return;
+  // 4. On mobile: detect frozen/black video by checking if frames are updating
+  const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)&&!window.MSStream;
+  const isMobile=isMobileDevice();
+  const lv=document.querySelector("#t-local video");
 
-  console.log("[mulle] tracks ended/muted — reacquiring");
+  // Check for dead tracks OR frozen video (mobile-specific)
+  const deadVideo=localStream.getVideoTracks().filter(t=>t.readyState==="ended");
+  const deadAudio=localStream.getAudioTracks().filter(t=>t.readyState==="ended");
+
+  // On mobile, also treat muted-by-system as dead
+  const mutedVideo=isMobile?localStream.getVideoTracks().filter(t=>t.muted):[];
+  const needVideoReacquire=deadVideo.length>0||mutedVideo.length>0;
+
+  // On mobile, check for frozen frame using getVideoTracks()[0].getSettings()
+  // If video is frozen, the readyState check above misses it — use a frame counter
+  let videoFrozen=false;
+  if(isMobile&&camOn&&lv&&lv.srcObject&&lv.readyState>=2){
+    // Quick black frame detect: sample a pixel from the video
+    try{
+      const probe=document.createElement("canvas");probe.width=8;probe.height=8;
+      const px=probe.getContext("2d");px.drawImage(lv,0,0,8,8);
+      const d=px.getImageData(0,0,8,8).data;
+      let sum=0;for(let i=0;i<d.length;i+=4)sum+=d[i]+d[i+1]+d[i+2];
+      if(sum<100) videoFrozen=true; // all pixels near black = frozen/black frame
+    }catch(e){}
+  }
+
+  if(!needVideoReacquire&&!videoFrozen&&deadAudio.length===0) return;
+
+  console.log("[mulle] reacquiring — dead:",deadVideo.length,"muted:",mutedVideo.length,"frozen:",videoFrozen);
   try{
-    const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)&&!window.MSStream;
     const fresh=await navigator.mediaDevices.getUserMedia({
-      video:deadVideo.length>0?(isIOS?{facingMode:currentFacingMode}:{width:{ideal:1280},height:{ideal:720},facingMode:currentFacingMode}):false,
+      video:(needVideoReacquire||videoFrozen)?(isIOS?{facingMode:currentFacingMode}:{width:{ideal:1280},height:{ideal:720},facingMode:currentFacingMode}):false,
       audio:deadAudio.length>0,
     });
     fresh.getTracks().forEach(newTrack=>{
-      // Remove old dead/muted tracks
       localStream.getTracks()
-        .filter(t=>t.kind===newTrack.kind&&(t.readyState==="ended"||t.muted))
+        .filter(t=>t.kind===newTrack.kind)
         .forEach(t=>{localStream.removeTrack(t);t.stop();});
       localStream.addTrack(newTrack);
-      // Apply current enabled state
       if(newTrack.kind==="video") newTrack.enabled=camOn;
       if(newTrack.kind==="audio") newTrack.enabled=micOn;
-      // Update local tile video
-      const lv=document.querySelector("#t-local video");
+      // Update local tile video element
       if(lv&&lv.srcObject){
         lv.srcObject.getTracks()
           .filter(t=>t.kind===newTrack.kind)
@@ -1250,7 +1294,7 @@ async function reacquireMedia(){
         lv.srcObject.addTrack(newTrack);
         lv.play().catch(()=>{});
       }
-      // Update all RTCPeerConnections
+      // Update all peer connections
       peers.forEach(({pc})=>{
         pc.getSenders()
           .filter(s=>s.track&&s.track.kind===newTrack.kind)
@@ -1261,6 +1305,8 @@ async function reacquireMedia(){
       localStream.getVideoTracks().forEach(t=>t.enabled=true);
       document.querySelector("#t-local .tile-av")?.classList.add("h");
     }
+    // Restart bg loop if active
+    if(curBg&&curBg!=="none"){stopBgLoop(false);loadSeg().then(()=>startBgLoop());}
   }catch(e){console.warn("[mulle] reacquire failed:",e.message);}
 }
 
@@ -1279,6 +1325,39 @@ document.addEventListener("click",()=>{
     if(v.srcObject&&(v.paused||v.readyState<2))v.play().catch(()=>{});
   });
 },{passive:true});
+
+
+// ─── CONTROL BAR QUALITY PICKER ───────────────────────────────────────────────
+function toggleCtrlQualMenu(e){
+  e && e.stopPropagation();
+  const menu = document.getElementById("ctrlQualMenu");
+  if(menu) menu.classList.toggle("h");
+}
+async function pickCtrlQual(w, h, label){
+  // close menu
+  const menu = document.getElementById("ctrlQualMenu");
+  if(menu) menu.classList.add("h");
+  // update label on button
+  const lbl = document.getElementById("ctrlQualLabel");
+  if(lbl) lbl.textContent = label;
+  // highlight active
+  document.querySelectorAll(".ctrl-qual-item").forEach(x =>
+    x.classList.toggle("active", x.textContent === label)
+  );
+  // apply quality (shared fn)
+  await setVideoQuality(w, h, label);
+  // also sync the tile overlay label if visible
+  const tileQl = document.querySelector("#t-local .qual-label");
+  if(tileQl) tileQl.textContent = label;
+  // sync tile qual-items
+  document.querySelectorAll("#t-local .qual-item").forEach(x =>
+    x.classList.toggle("active", x.textContent === label)
+  );
+}
+// close ctrl qual menu on outside click
+document.addEventListener("click", () => {
+  document.getElementById("ctrlQualMenu")?.classList.add("h");
+});
 
 // ─── INIT ─────────────────────────────────────────────────────────────────────
 (async()=>{

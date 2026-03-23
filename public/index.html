@@ -535,6 +535,38 @@ input.inp:focus,textarea.inp:focus{border-color:var(--accent)}
 /* hide controls in self-pip mode (too small) */
 #grid.n2-pip .tile.self-pip .tile-local-controls{display:none!important}
 
+/* ── control bar quality picker ── */
+.ctrl-qual-wrap{position:relative;display:flex;flex-shrink:0}
+.ctrl-qual-menu{
+  position:absolute;
+  bottom:calc(100% + 8px);
+  left:50%;
+  transform:translateX(-50%);
+  background:rgba(14,14,26,.97);
+  backdrop-filter:blur(14px);
+  border:1px solid rgba(255,255,255,.18);
+  border-radius:12px;
+  padding:6px;
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+  z-index:100;
+  min-width:90px;
+  box-shadow:0 -8px 28px rgba(0,0,0,.5);
+}
+.ctrl-qual-menu.h{display:none}
+.ctrl-qual-item{
+  background:transparent;border:none;color:#cbd5e1;
+  padding:8px 16px;border-radius:8px;cursor:pointer;
+  font:700 .82rem/1 var(--ff);text-align:center;
+  transition:background .15s,color .15s;
+  -webkit-tap-highlight-color:transparent;
+}
+.ctrl-qual-item:hover,.ctrl-qual-item:active{background:rgba(99,102,241,.5);color:#fff}
+.ctrl-qual-item.active{background:rgba(99,102,241,.85);color:#fff}
+/* on mobile: hide this ctrl button (tile overlay handles it) */
+@media(max-width:780px){.ctrl-qual-wrap{display:none}}
+
 /* right panels */
 .rpanel{width:var(--chat);background:var(--s1);border-left:1px solid var(--border);
   display:flex;flex-direction:column;flex-shrink:0;transition:width .28s,opacity .28s;overflow:hidden}
@@ -954,6 +986,15 @@ input.inp:focus,textarea.inp:focus{border-color:var(--accent)}
     <button class="cb on"  id="micBtn"  onclick="toggleMic()">  <span class="ico">🎙️</span><span data-i="mic">میک</span></button>
     <button class="cb on"  id="camBtn"  onclick="toggleCam()">  <span class="ico">📷</span><span data-i="cam">کم</span></button>
     <button class="cb"     id="flipBtn" onclick="switchCamera()" style="display:none"><span class="ico">🔄</span><span data-i="flip">چرخش</span></button>
+    <div class="ctrl-qual-wrap" id="ctrlQualWrap">
+      <button class="cb" id="ctrlQualBtn" onclick="toggleCtrlQualMenu(event)"><span class="ico">📐</span><span id="ctrlQualLabel">720p</span></button>
+      <div class="ctrl-qual-menu h" id="ctrlQualMenu">
+        <button class="ctrl-qual-item" onclick="pickCtrlQual(854,480,'480p')">480p</button>
+        <button class="ctrl-qual-item" onclick="pickCtrlQual(1280,720,'720p')">720p</button>
+        <button class="ctrl-qual-item" onclick="pickCtrlQual(1920,1080,'1080p')">1080p</button>
+        <button class="ctrl-qual-item" onclick="pickCtrlQual(3840,2160,'4K')">4K</button>
+      </div>
+    </div>
     <button class="cb"     id="scrBtn"  onclick="toggleScreen()"><span class="ico">🖥️</span><span data-i="screen">صفحه</span></button>
     <button class="cb"     id="bgBtn"   onclick="openBgModal()"> <span class="ico">🎨</span><span data-i="bg">پس‌زمینه</span></button>
     <div class="csep"></div>
