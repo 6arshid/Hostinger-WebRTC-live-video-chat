@@ -2,7 +2,10 @@
 <html lang="fa" dir="rtl" id="htmlRoot">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="mobile-web-app-capable" content="yes"/>
 <title>Mulle — موله</title>
 <meta name="description" content="Mulle — Secure group video calls, no install, no sign-up"/>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
@@ -374,6 +377,44 @@ input.inp:focus,textarea.inp:focus{border-color:var(--accent)}
   height:120px;
   border-radius:var(--r);
 }
+/* ── 2-person WhatsApp/Meet style: remote full, local small ── */
+#grid.n2-pip{
+  display:block!important;
+  position:relative;
+  width:100%;height:100%;
+}
+#grid.n2-pip .tile:not(.self-pip){
+  position:absolute!important;
+  inset:0;
+  width:100%!important;height:100%!important;
+  border-radius:0!important;
+  border:none!important;
+}
+#grid.n2-pip .tile.self-pip{
+  position:absolute!important;
+  bottom:14px;right:14px;
+  width:110px!important;height:160px!important;
+  min-height:unset!important;
+  border-radius:14px!important;
+  border:2.5px solid rgba(255,255,255,.3)!important;
+  box-shadow:0 4px 20px rgba(0,0,0,.5)!important;
+  z-index:10;
+  overflow:hidden;
+  cursor:pointer;
+  transition:transform .15s;
+}
+#grid.n2-pip .tile.self-pip:hover{transform:scale(1.04)}
+#grid.n2-pip .tile.self-pip .tile-nm{font-size:.55rem;padding:2px 6px}
+#grid.n2-pip .tile.self-pip .pin-btn,
+#grid.n2-pip .tile.self-pip .watch-btn,
+#grid.n2-pip .tile.self-pip .pip-btn{display:none!important}
+@media(max-width:780px){
+  #grid.n2-pip .tile.self-pip{
+    width:90px!important;height:130px!important;
+    bottom:10px;right:10px;
+  }
+}
+
 /* pin button on each tile */
 .pin-btn{
   position:absolute;bottom:5px;right:5px;
@@ -422,6 +463,38 @@ input.inp:focus,textarea.inp:focus{border-color:var(--accent)}
 .watch-btn:hover{background:rgba(64,128,255,.7)}
 .watch-btn.hidden-active{display:grid!important;background:rgba(220,38,38,.7)}
 .watch-btn.hidden-active:hover{background:rgba(220,38,38,.9)}
+
+/* ── local tile action buttons (flip + quality) ── */
+.tile-local-btn{
+  position:absolute;bottom:32px;
+  width:28px;height:28px;border-radius:8px;
+  background:rgba(0,0,0,.6);backdrop-filter:blur(6px);
+  border:1px solid rgba(255,255,255,.15);color:#fff;
+  cursor:pointer;font-size:.75rem;display:grid;place-items:center;
+  transition:background .18s,transform .15s;z-index:5;
+  box-shadow:0 2px 8px rgba(0,0,0,.4);
+}
+.tile-local-btn:hover{background:rgba(64,128,255,.75);transform:scale(1.1)}
+.tile-flip-btn{right:36px}
+.tile-qual-btn{right:6px}
+
+/* quality popup */
+.qual-menu{
+  position:absolute;bottom:65px;right:6px;
+  background:rgba(18,18,30,.92);backdrop-filter:blur(10px);
+  border:1px solid rgba(255,255,255,.15);border-radius:10px;
+  padding:5px;display:flex;flex-direction:column;gap:3px;
+  z-index:20;min-width:80px;box-shadow:0 4px 20px rgba(0,0,0,.5);
+}
+.qual-menu.h{display:none}
+.qual-item{
+  background:transparent;border:none;color:#e2e8f0;
+  padding:6px 12px;border-radius:7px;cursor:pointer;
+  font-size:.75rem;font-weight:600;text-align:center;
+  transition:background .15s;
+}
+.qual-item:hover{background:rgba(99,102,241,.5)}
+.qual-item.active{background:rgba(99,102,241,.75);color:#fff}
 
 /* right panels */
 .rpanel{width:var(--chat);background:var(--s1);border-left:1px solid var(--border);
@@ -586,17 +659,28 @@ input.inp:focus,textarea.inp:focus{border-color:var(--accent)}
     width:var(--chat)!important;border-radius:16px 16px 0 0;opacity:1!important;
     border-top:1px solid var(--border);border-left:none!important;border-right:none!important}
   .rpanel.h{height:0!important;width:0!important;overflow:hidden!important}
-  /* Mobile: all grid layouts stack vertically (one column) */
+  /* Mobile: vertical scroll, each tile fixed height */
   #grid.n1,#grid.n2,#grid.n3,#grid.n4,
   #grid.n5,#grid.n6,#grid.n7,#grid.n8,
   #grid.n9,#grid.n10{
     grid-template-columns:1fr!important;
-    grid-template-rows:repeat(auto-fill,1fr)!important;
+    grid-template-rows:none!important;
     overflow-y:auto;
+    overflow-x:hidden;
+    align-content:start;
+  }
+  /* Each tile gets fixed height on mobile */
+  #grid.n1 .tile,#grid.n2 .tile,#grid.n3 .tile,#grid.n4 .tile,
+  #grid.n5 .tile,#grid.n6 .tile,#grid.n7 .tile,#grid.n8 .tile,
+  #grid.n9 .tile,#grid.n10 .tile{
+    height:260px!important;
+    min-height:260px!important;
+    flex:none!important;
   }
   /* Spotlight on mobile */
-  #grid.spotlight .tiles-strip{height:90px}
-  #grid.spotlight .tiles-strip .tile{flex:0 0 120px;width:120px;height:90px}
+  #grid.spotlight .tile-pinned{min-height:280px}
+  #grid.spotlight .tiles-strip{height:100px}
+  #grid.spotlight .tiles-strip .tile{flex:0 0 130px;width:130px;height:100px!important;min-height:100px!important}
   /* Mobile ctrl: circular icon-only buttons */
   .cb{
     width:46px;height:46px;min-width:46px;
@@ -830,6 +914,7 @@ input.inp:focus,textarea.inp:focus{border-color:var(--accent)}
   <div class="ctrl">
     <button class="cb on"  id="micBtn"  onclick="toggleMic()">  <span class="ico">🎙️</span><span data-i="mic">میک</span></button>
     <button class="cb on"  id="camBtn"  onclick="toggleCam()">  <span class="ico">📷</span><span data-i="cam">کم</span></button>
+    <button class="cb"     id="flipBtn" onclick="switchCamera()" style="display:none"><span class="ico">🔄</span><span data-i="flip">چرخش</span></button>
     <button class="cb"     id="scrBtn"  onclick="toggleScreen()"><span class="ico">🖥️</span><span data-i="screen">صفحه</span></button>
     <button class="cb"     id="bgBtn"   onclick="openBgModal()"> <span class="ico">🎨</span><span data-i="bg">پس‌زمینه</span></button>
     <div class="csep"></div>

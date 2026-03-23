@@ -43,6 +43,7 @@ window.LANGS = {
     // controls
     mic: "میک",
     cam: "کم",
+    flip: "دوربین",
     screen: "صفحه",
     bg: "پس‌زمینه",
     rec: "ضبط",
@@ -175,6 +176,7 @@ window.LANGS = {
     persons: "",
     mic: "Mic",
     cam: "Cam",
+    flip: "Flip",
     screen: "Screen",
     bg: "BG",
     rec: "Rec",
