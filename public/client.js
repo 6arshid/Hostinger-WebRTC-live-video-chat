@@ -577,53 +577,57 @@ function mkTile(id,name,avatar,isLocal,isScr,isOwner=false){
   pinB.setAttribute("data-tid",id);
   pinB.onclick=(e)=>{e.stopPropagation();togglePin(id);};
 
-  // ── LOCAL-ONLY: flip camera + quality picker ──
-  const tileFlipBtn=document.createElement("button");
-  tileFlipBtn.className="tile-local-btn tile-flip-btn";
-  tileFlipBtn.title=window.currentLang==="fa"?"دوربین جلو / عقب":"Switch camera (front/back)";
-  tileFlipBtn.innerHTML=currentFacingMode==="user"?"🤳":"📷";
-  tileFlipBtn.setAttribute("data-local-only","1");
-  tileFlipBtn.style.display=""; // always visible on local tile
-  tileFlipBtn.onclick=async(e)=>{
+  // ── LOCAL-ONLY: camera flip + quality controls ──
+  // Always-visible container at top-center of local tile
+  const localControls = document.createElement("div");
+  localControls.className = "tile-local-controls";
+
+  // Flip button
+  const tileFlipBtn = document.createElement("button");
+  tileFlipBtn.className = "tile-local-btn tile-flip-btn";
+  tileFlipBtn.title = window.currentLang === "fa" ? "تغییر دوربین جلو/عقب" : "Switch camera";
+  tileFlipBtn.innerHTML = currentFacingMode === "user" ? "🤳" : "📷";
+  tileFlipBtn.onclick = async (e) => {
     e.stopPropagation();
     await switchCamera();
-    tileFlipBtn.innerHTML=currentFacingMode==="user"?"🤳":"📷";
-    tileFlipBtn.title=window.currentLang==="fa"
-      ?(currentFacingMode==="user"?"دوربین جلو — کلیک برای عقب":"دوربین عقب — کلیک برای جلو")
-      :(currentFacingMode==="user"?"Front camera — click to switch":"Back camera — click to switch");
+    tileFlipBtn.innerHTML = currentFacingMode === "user" ? "🤳" : "📷";
   };
 
-  const tileQualBtn=document.createElement("button");
-  tileQualBtn.className="tile-local-btn tile-qual-btn";
-  tileQualBtn.title=window.currentLang==="fa"?"کیفیت تصویر":"Video quality";
-  tileQualBtn.innerHTML=`<span class="qual-label">${currentQuality}</span>`;
-  tileQualBtn.setAttribute("data-local-only","1");
+  // Quality button
+  const tileQualBtn = document.createElement("button");
+  tileQualBtn.className = "tile-local-btn tile-qual-btn";
+  tileQualBtn.title = window.currentLang === "fa" ? "کیفیت تصویر" : "Video quality";
+  tileQualBtn.innerHTML = `<span class="qual-label">${currentQuality}</span>`;
 
-  // quality popup menu
-  const qualMenu=document.createElement("div");
-  qualMenu.className="qual-menu h";
-  const qualities=[{label:"480p",w:854,h:480},{label:"720p",w:1280,h:720},{label:"1080p",w:1920,h:1080},{label:"4K",w:3840,h:2160}];
-  qualities.forEach(q=>{
-    const item=document.createElement("button");
-    item.className="qual-item"+(currentQuality===q.label?" active":"");
-    item.textContent=q.label;
-    item.onclick=async(e)=>{
+  // Quality popup
+  const qualMenu = document.createElement("div");
+  qualMenu.className = "qual-menu h";
+  const qualities = [{label:"480p",w:854,h:480},{label:"720p",w:1280,h:720},{label:"1080p",w:1920,h:1080},{label:"4K",w:3840,h:2160}];
+  qualities.forEach(q => {
+    const item = document.createElement("button");
+    item.className = "qual-item" + (currentQuality === q.label ? " active" : "");
+    item.textContent = q.label;
+    item.onclick = async (e) => {
       e.stopPropagation();
       qualMenu.classList.add("h");
-      await setVideoQuality(q.w,q.h,q.label);
-      qualMenu.querySelectorAll(".qual-item").forEach(x=>x.classList.toggle("active",x.textContent===q.label));
-      const ql=tileQualBtn.querySelector(".qual-label");
-      if(ql)ql.textContent=q.label;
+      await setVideoQuality(q.w, q.h, q.label);
+      qualMenu.querySelectorAll(".qual-item").forEach(x => x.classList.toggle("active", x.textContent === q.label));
+      const ql = tileQualBtn.querySelector(".qual-label");
+      if (ql) ql.textContent = q.label;
     };
     qualMenu.appendChild(item);
   });
-  tileQualBtn.onclick=(e)=>{e.stopPropagation();qualMenu.classList.toggle("h");};
-  document.addEventListener("click",()=>qualMenu.classList.add("h"),{capture:false});
+  tileQualBtn.onclick = (e) => { e.stopPropagation(); qualMenu.classList.toggle("h"); };
+  document.addEventListener("click", () => qualMenu.classList.add("h"), {capture: false});
+
+  localControls.append(tileFlipBtn, tileQualBtn);
+
+  localControls.append(tileFlipBtn,tileQualBtn);
 
   if(isLocal){
-    d.append(v,av,nm,ics,pip,watchBtn,pinB,tileFlipBtn,tileQualBtn,qualMenu);
+    d.append(v, av, nm, ics, pip, watchBtn, pinB, localControls, qualMenu);
     // expose flip btn so camera enumeration can show it
-    d._tileFlipBtn=tileFlipBtn;
+    d._tileFlipBtn=tileFlipBtn; d._localControls=localControls;
   } else {
     d.append(v,av,nm,ics,pip,watchBtn,pinB);
   }
@@ -840,8 +844,23 @@ function setOwnerUI(v){
 }
 
 // ─── SCREEN SHARE ─────────────────────────────────────────────────────────────
+function isMobileDevice(){
+  return /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+    || (navigator.maxTouchPoints>1 && /MacIntel/.test(navigator.platform));
+}
+function initScrBtn(){
+  const btn=$("scrBtn");
+  if(!btn)return;
+  if(isMobileDevice()||!navigator.mediaDevices?.getDisplayMedia){
+    btn.style.display="none"; // hide on mobile — getDisplayMedia not supported
+  }
+}
 async function toggleScreen(){screenOn?stopScreen():await startScreen();}
 async function startScreen(){
+  if(isMobileDevice()||!navigator.mediaDevices?.getDisplayMedia){
+    toast(window.currentLang==="fa"?"⚠️ اشتراک‌گذاری صفحه در موبایل پشتیبانی نمی‌شود":"⚠️ Screen share is not supported on mobile",4000);
+    return;
+  }
   try{
     screenStream=await navigator.mediaDevices.getDisplayMedia({video:{frameRate:15},audio:true});
     screenOn=true;$("scrBtn").className="cb scron";$("scrBtn").querySelector(".ico").textContent="⏹";
@@ -1263,6 +1282,7 @@ document.addEventListener("click",()=>{
 
 // ─── INIT ─────────────────────────────────────────────────────────────────────
 (async()=>{
+  initScrBtn(); // hide screen share button on mobile
   // Load rooms list
   try{const list=await fetch("/api/rooms").then(r=>r.json());renderRooms(list);}catch{renderRooms([]);}
 

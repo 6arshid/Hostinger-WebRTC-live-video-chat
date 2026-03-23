@@ -455,6 +455,7 @@ input.inp:focus,textarea.inp:focus{border-color:var(--accent)}
   background:rgba(0,0,0,.55);backdrop-filter:blur(4px);border:none;color:#fff;
   cursor:pointer;font-size:.58rem;display:none;place-items:center;transition:background .18s}
 .tile:hover .pip-btn{display:grid}
+.tile.me .pip-btn{display:grid}
 .pip-btn:hover{background:rgba(64,128,255,.7)}
 .watch-btn{position:absolute;top:5px;left:32px;width:22px;height:22px;border-radius:6px;
   background:rgba(0,0,0,.55);backdrop-filter:blur(4px);border:none;color:#fff;
@@ -464,41 +465,75 @@ input.inp:focus,textarea.inp:focus{border-color:var(--accent)}
 .watch-btn.hidden-active{display:grid!important;background:rgba(220,38,38,.7)}
 .watch-btn.hidden-active:hover{background:rgba(220,38,38,.9)}
 
-/* ── local tile action buttons (flip + quality) ── */
-.tile-local-btn{
-  position:absolute;bottom:32px;
-  height:26px;border-radius:8px;
-  background:rgba(0,0,0,.65);backdrop-filter:blur(6px);
-  border:1px solid rgba(255,255,255,.2);color:#fff;
-  cursor:pointer;font-size:.7rem;display:grid;place-items:center;
-  transition:background .18s,transform .15s,box-shadow .15s;z-index:5;
-  box-shadow:0 2px 8px rgba(0,0,0,.5);
-  opacity:.92;padding:0 7px;min-width:26px;
+/* ── local tile: camera controls overlay ── */
+/* sits at top-center of the local tile, ALWAYS visible, works on mobile too */
+.tile-local-controls{
+  position:absolute;
+  top:8px;
+  left:50%;
+  transform:translateX(-50%);
+  display:flex;
+  gap:6px;
+  z-index:15;
+  pointer-events:auto;
 }
-.tile-local-btn:hover{background:rgba(64,128,255,.8);transform:scale(1.08);opacity:1;box-shadow:0 4px 14px rgba(64,128,255,.4)}
-/* flip button: icon only */
-.tile-flip-btn{right:70px;font-size:.85rem;width:28px;padding:0}
-/* quality button: shows current quality label */
-.tile-qual-btn{right:6px;font-weight:700;letter-spacing:.5px;min-width:42px}
-.qual-label{font-size:.68rem;font-weight:700;line-height:1}
+.tile-local-btn{
+  height:30px;
+  border-radius:20px;
+  background:rgba(0,0,0,.75);
+  backdrop-filter:blur(8px);
+  border:1.5px solid rgba(255,255,255,.3);
+  color:#fff;
+  cursor:pointer;
+  font-size:.8rem;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  transition:background .18s,transform .15s;
+  box-shadow:0 2px 10px rgba(0,0,0,.6);
+  padding:0 10px;
+  min-width:30px;
+  white-space:nowrap;
+  -webkit-tap-highlight-color:transparent;
+}
+.tile-local-btn:hover,.tile-local-btn:active{
+  background:rgba(64,128,255,.9);
+  transform:scale(1.06);
+}
+/* quality button label */
+.tile-qual-btn{font-weight:800;font-size:.72rem;letter-spacing:.4px;min-width:46px}
+.qual-label{font-size:.72rem;font-weight:800;line-height:1}
 
-/* quality popup */
+/* quality popup — opens downward from center */
 .qual-menu{
-  position:absolute;bottom:62px;right:6px;
-  background:rgba(14,14,26,.95);backdrop-filter:blur(12px);
-  border:1px solid rgba(255,255,255,.18);border-radius:12px;
-  padding:6px;display:flex;flex-direction:column;gap:4px;
-  z-index:20;min-width:88px;box-shadow:0 8px 28px rgba(0,0,0,.6);
+  position:absolute;
+  top:38px;
+  left:50%;
+  transform:translateX(-50%);
+  background:rgba(14,14,26,.96);
+  backdrop-filter:blur(12px);
+  border:1px solid rgba(255,255,255,.18);
+  border-radius:12px;
+  padding:6px;
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+  z-index:30;
+  min-width:90px;
+  box-shadow:0 8px 28px rgba(0,0,0,.6);
 }
 .qual-menu.h{display:none}
 .qual-item{
   background:transparent;border:none;color:#cbd5e1;
-  padding:7px 14px;border-radius:8px;cursor:pointer;
-  font-size:.78rem;font-weight:700;text-align:center;
+  padding:8px 14px;border-radius:8px;cursor:pointer;
+  font-size:.8rem;font-weight:700;text-align:center;
   transition:background .15s,color .15s;
+  -webkit-tap-highlight-color:transparent;
 }
-.qual-item:hover{background:rgba(99,102,241,.45);color:#fff}
-.qual-item.active{background:rgba(99,102,241,.8);color:#fff;box-shadow:0 2px 8px rgba(99,102,241,.3)}
+.qual-item:hover,.qual-item:active{background:rgba(99,102,241,.5);color:#fff}
+.qual-item.active{background:rgba(99,102,241,.85);color:#fff}
+/* hide controls in self-pip mode (too small) */
+#grid.n2-pip .tile.self-pip .tile-local-controls{display:none!important}
 
 /* right panels */
 .rpanel{width:var(--chat);background:var(--s1);border-left:1px solid var(--border);
