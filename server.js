@@ -1,8 +1,5 @@
 "use strict";
 
-// Load .env file if present
-try{require("fs").readFileSync(".env").toString().split("\n").forEach(l=>{const[k,...v]=l.split("=");if(k&&!k.startsWith("#"))process.env[k.trim()]=v.join("=").trim();});}catch{}
-
 const express    = require("express");
 const http       = require("http");
 const https      = require("https");
@@ -21,44 +18,18 @@ const MAX_SLUG_LEN = 80;
 const ADJS  = ["swift","brave","calm","dark","epic","fair","gold","jade","keen","lush","mild","neat","pure","rapid","safe","teal","vast","warm","bold","cool"];
 const NOUNS = ["falcon","river","stone","bloom","flame","grove","haven","isle","jungle","kite","lagoon","mesa","nova","orbit","plaza","realm","summit","trail","vault","creek"];
 
-// ─── TURN Server Config ───────────────────────────────────────────────────────
-// Set these env vars to use your own coturn server (recommended)
-// Install coturn: apt install coturn
-// See setup-turn.sh for full instructions
-const TURN_DOMAIN = process.env.TURN_DOMAIN || process.env.HOST || "localhost";
-const TURN_SECRET = process.env.TURN_SECRET || "mulle_turn_secret_change_me";
-const TURN_PORT   = process.env.TURN_PORT   || "3478";
-const TURN_TLS    = process.env.TURN_TLS    || "5349";
-const USE_TURN    = process.env.USE_TURN    !== "false"; // default true
-
-// Generate short-lived TURN credentials using HMAC-SHA1 (coturn lt-cred-mech)
-// Credentials expire after TTL seconds — more secure than static passwords
-function genTurnCreds(ttl=86400){
-  const exp = Math.floor(Date.now()/1000) + ttl;
-  const user = `${exp}:mulle`;
-  const pass = crypto.createHmac("sha1", TURN_SECRET).update(user).digest("base64");
-  return {username: user, credential: pass};
-}
-
-function buildICE(){
-  const stun=[
-    {urls:"stun:stun.l.google.com:19302"},
-    {urls:"stun:stun1.l.google.com:19302"},
-  ];
-  if(!USE_TURN){
-    console.log("[ICE] TURN disabled — P2P only (will fail across different networks)");
-    return stun;
-  }
-  const {username, credential} = genTurnCreds();
-  console.log("[ICE] Building ICE with TURN: "+TURN_DOMAIN+":"+TURN_PORT);
-  const turn=[
-    {urls:"turn:"+TURN_DOMAIN+":"+TURN_PORT,              username, credential},
-    {urls:"turn:"+TURN_DOMAIN+":"+TURN_PORT+"?transport=tcp", username, credential},
-    {urls:"turns:"+TURN_DOMAIN+":"+TURN_TLS,              username, credential},
-  ];
-  return [...stun, ...turn];
-}
-const ICE = buildICE();
+const ICE = [
+  {urls:"stun:stun.l.google.com:19302"},
+  {urls:"stun:stun1.l.google.com:19302"},
+  {urls:"stun:stun2.l.google.com:19302"},
+  {urls:"stun:stun3.l.google.com:19302"},
+  {urls:"turn:openrelay.metered.ca:80",          username:"openrelayproject",credential:"openrelayproject"},
+  {urls:"turn:openrelay.metered.ca:443",         username:"openrelayproject",credential:"openrelayproject"},
+  {urls:"turns:openrelay.metered.ca:443",        username:"openrelayproject",credential:"openrelayproject"},
+  {urls:"turn:openrelay.metered.ca:443?transport=tcp", username:"openrelayproject",credential:"openrelayproject"},
+  // Cloudflare STUN
+  {urls:"stun:stun.cloudflare.com:3478"},
+];
 
 // ─── Slug ─────────────────────────────────────────────────────────────────────
 function genSlug(){
@@ -249,7 +220,7 @@ io.on("connection",(socket)=>{
     room.peers.set(socket.id,myInfo);socket.join(rid);
     const ex=[...room.peers.values()].filter(p=>p.id!==socket.id);
     ex.forEach(p=>io.to(p.id).emit("peer:new",{peerId:socket.id,name,avatar}));
-    cb({ok:true,iceServers:buildICE(),isOwner:socket.id===room.ownerId,
+    cb({ok:true,iceServers:ICE,isOwner:socket.id===room.ownerId,
       roomName:room.name,isPublic:room.isPublic,streaming:room.streaming,
       existingPeers:ex.map(p=>({id:p.id,name:p.name,avatar:p.avatar,isOwner:p.isOwner}))});
     broadcastRooms();
@@ -305,16 +276,6 @@ io.on("connection",(socket)=>{
     const enabled=typeof data.enabled==="boolean"?data.enabled:null;
     if(!kind||enabled===null)return;
     socket.to(roomId).emit("peer:media",{peerId:socket.id,kind,enabled});
-  });
-
-  // ── Socket media relay (fallback when WebRTC P2P fails) ──
-  // Relays MediaRecorder chunks: senderA → server → receiverB
-  // Works on ALL networks without TURN server
-  socket.on("relay:chunk",({to,chunk,mime})=>{
-    if(!roomId||typeof to!=="string"||to.length>30)return;
-    if(!rateOk(`relay:${socket.id}`,1000))return; // 1000 chunks/min
-    const room=rooms.get(roomId);if(!room||!room.peers.has(to))return;
-    io.to(to).emit("relay:chunk",{from:socket.id,chunk,mime});
   });
 
   // ── chat ──
